@@ -8,8 +8,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { ChevronLeft, Play, CheckCircle2, FastForward } from 'lucide-vue-next';
+import { ChevronLeft, Play, CheckCircle2, FastForward, Trophy, Info } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'vue-sonner';
 
 const route = useRoute();
@@ -100,7 +101,7 @@ const finishTournament = () => {
       </div>
       <div class="text-center space-y-2">
         <h2 class="text-xl font-semibold">Pronto para começar?</h2>
-        <p class="text-muted-foreground max-w-xs">O sistema irá gerar os pareamentos iniciais baseados no rating dos jogadores.</p>
+        <p class="text-muted-foreground max-w-xs">O sistema irá gerar os pareamentos iniciais (Metade Superior vs Inferior).</p>
       </div>
       <Button size="lg" @click="startTournament" class="px-8">
         Iniciar Torneio
@@ -190,8 +191,28 @@ const finishTournament = () => {
                 <TableHead class="w-16 text-center">Pos</TableHead>
                 <TableHead>Jogador</TableHead>
                 <TableHead class="text-center">Pontos</TableHead>
-                <TableHead class="text-center">Buchholz</TableHead>
-                <TableHead class="text-center">Partidas</TableHead>
+                <TableHead class="text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    BH
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger><Info class="w-3 h-3" /></TooltipTrigger>
+                        <TooltipContent>Buchholz: Soma dos pontos dos oponentes</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </TableHead>
+                <TableHead class="text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    SB
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger><Info class="w-3 h-3" /></TooltipTrigger>
+                        <TooltipContent>Sonneborn-Berger: Soma dos pontos dos oponentes derrotados + metade dos empatados</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </TableHead>
                 <TableHead class="text-center">Saldo Cores</TableHead>
               </TableRow>
             </TableHeader>
@@ -206,7 +227,7 @@ const finishTournament = () => {
                   <Badge variant="secondary" class="text-base font-bold px-3">{{ s.points }}</Badge>
                 </TableCell>
                 <TableCell class="text-center font-medium">{{ s.buchholz }}</TableCell>
-                <TableCell class="text-center text-muted-foreground">{{ s.gamesPlayed }}</TableCell>
+                <TableCell class="text-center font-medium">{{ s.sonnebornBerger }}</TableCell>
                 <TableCell class="text-center">
                   <span :class="s.colorBalance > 0 ? 'text-blue-600' : s.colorBalance < 0 ? 'text-orange-600' : ''">
                     {{ s.colorBalance > 0 ? '+' : '' }}{{ s.colorBalance }}
