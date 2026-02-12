@@ -5,13 +5,14 @@ import { useChessStore } from '@/stores/chessStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
-import { Trophy, Calendar, Users, Trash2, UserPlus, UserMinus, Search } from 'lucide-vue-next';
+import { Trophy, Calendar, Users, Trash2, UserPlus, UserMinus, Search, Plus, X } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const store = useChessStore();
 const router = useRouter();
 
+const showForm = ref(false);
 const newName = ref('');
 const selectedPlayerIds = ref<string[]>([]);
 const searchQuery = ref('');
@@ -46,6 +47,7 @@ const handleCreate = () => {
   });
   newName.value = '';
   selectedPlayerIds.value = [];
+  showForm.value = false;
 };
 
 const getStatusLabel = (status: string) => {
@@ -60,9 +62,15 @@ const getStatusLabel = (status: string) => {
 
 <template>
   <div class="container mx-auto p-6 space-y-8">
-    <h1 class="text-3xl font-bold">Torneios</h1>
+    <div class="flex justify-between items-center">
+      <h1 class="text-3xl font-bold">Torneios</h1>
+      <Button @click="showForm = !showForm" :variant="showForm ? 'outline' : 'default'">
+        <component :is="showForm ? X : Plus" class="w-4 h-4 mr-2" />
+        {{ showForm ? 'Cancelar' : 'Novo Torneio' }}
+      </Button>
+    </div>
 
-    <Card>
+    <Card v-if="showForm" class="border-primary/20 shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
       <CardHeader>
         <CardTitle>Criar Novo Torneio</CardTitle>
       </CardHeader>
@@ -164,6 +172,16 @@ const getStatusLabel = (status: string) => {
           </Button>
         </CardFooter>
       </Card>
+      
+      <div v-if="store.tournaments.length === 0 && !showForm" class="col-span-full py-20 text-center border-2 border-dashed rounded-xl bg-muted/20">
+        <Trophy class="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+        <h3 class="text-lg font-medium">Nenhum torneio encontrado</h3>
+        <p class="text-muted-foreground mb-6">Comece criando seu primeiro torneio de xadrez.</p>
+        <Button @click="showForm = true">
+          <Plus class="w-4 h-4 mr-2" />
+          Criar Primeiro Torneio
+        </Button>
+      </div>
     </div>
   </div>
 </template>
