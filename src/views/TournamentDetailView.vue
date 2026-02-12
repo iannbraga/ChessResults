@@ -176,7 +176,7 @@ const finishTournament = () => {
                     <Select 
                       v-else
                       :model-value="match.result || 'null'" 
-                      @update:model-value="(val) => updateResult(tournament.rounds.length - 1 - rIdx, match.id, val === 'null' ? null : val)"
+                      @update:model-value="(val) => tournament && updateResult(tournament.rounds.length - 1 - rIdx, match.id, val === 'null' ? null : val)"
                       :disabled="tournament.status === 'finished'"
                     >
                       <SelectTrigger class="w-24 mx-auto h-8 text-xs">
