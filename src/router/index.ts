@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import PlayersView from '@/views/PlayersView.vue';
 import TournamentsView from '@/views/TournamentsView.vue';
 import TournamentDetailView from '@/views/TournamentDetailView.vue';
+import BackupView from '@/views/BackupView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,6 +11,7 @@ const router = createRouter({
     { path: '/players', name: 'players', component: PlayersView },
     { path: '/tournaments', name: 'tournaments', component: TournamentsView },
     { path: '/tournaments/:id', name: 'tournament-detail', component: TournamentDetailView },
+    { path: '/backup', name: 'backup', component: BackupView },
   ],
 });
 
