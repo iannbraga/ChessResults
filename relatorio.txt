@@ -1,0 +1,1202 @@
+
+--- INICIO DE: src/App.vue ---
+<script setup lang="ts">
+import { RouterLink, RouterView } from 'vue-router';
+import { Trophy, Database } from 'lucide-vue-next';
+</script>
+
+<template>
+  <div class="min-h-screen flex flex-col bg-background">
+    <header class="border-b bg-card sticky top-0 z-50">
+      <div class="container mx-auto px-6 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-2 font-bold text-xl">
+          <Trophy class="text-primary" />
+          <span>ChessManager</span>
+        </div>
+        <nav class="flex gap-6">
+          <RouterLink 
+            to="/tournaments" 
+            class="text-sm font-medium transition-colors hover:text-primary"
+            active-class="text-primary"
+          >
+            Torneios
+          </RouterLink>
+          <RouterLink 
+            to="/players" 
+            class="text-sm font-medium transition-colors hover:text-primary"
+            active-class="text-primary"
+          >
+            Jogadores
+          </RouterLink>
+          <RouterLink 
+            to="/backup" 
+            class="text-sm font-medium transition-colors hover:text-primary flex items-center gap-1.5"
+            active-class="text-primary"
+          >
+            <Database class="w-3.5 h-3.5" />
+            Dados
+          </RouterLink>
+        </nav>
+      </div>
+    </header>
+
+    <main class="flex-1">
+      <RouterView />
+    </main>
+  </div>
+</template>
+
+<style>
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+</style>
+
+--- INICIO DE: src/composables/useIsMobile.ts ---
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+
+const MOBILE_BREAKPOINT = 768;
+
+export function useIsMobile() {
+  const isMobile = ref<boolean | undefined>(undefined);
+
+  const updateIsMobile = () => {
+    isMobile.value = window.innerWidth < MOBILE_BREAKPOINT;
+  };
+
+  const setupMediaQuery = () => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+
+    // Set initial value
+    updateIsMobile();
+
+    // Add event listener
+    mql.addEventListener('change', updateIsMobile);
+
+    // Return cleanup function
+    return () => mql.removeEventListener('change', updateIsMobile);
+  };
+
+  let cleanup: (() => void) | null = null;
+
+  onMounted(() => {
+    cleanup = setupMediaQuery();
+  });
+
+  onUnmounted(() => {
+    if (cleanup) {
+      cleanup();
+    }
+  });
+
+  // Return reactive value that converts undefined to false
+  return computed(() => !!isMobile.value);
+}
+
+--- INICIO DE: src/lib/chess-logic.ts ---
+import type { Player, Tournament, Match, Standing, Round } from '@/types/chess';
+
+export function calculateStandings(tournament: Tournament, allPlayers: Player[]): Standing[] {
+  const standingsMap = new Map<string, Standing>();
+
+  // Inicializa jogadores
+  tournament.playerIds.forEach(id => {
+    const player = allPlayers.find(p => p.id === id);
+    standingsMap.set(id, {
+      playerId: id,
+      playerName: player?.name || 'Desconhecido',
+      points: 0,
+      buchholz: 0,
+      sonnebornBerger: 0,
+      gamesPlayed: 0,
+      colorBalance: 0,
+      lastColor: null,
+      colorStreak: 0,
+      hadBye: false,
+      opponents: []
+    });
+  });
+
+  // 1. Pontos, Cores e Oponentes
+  tournament.rounds.forEach(round => {
+    round.matches.forEach(match => {
+      const white = standingsMap.get(match.whiteId);
+      const black = standingsMap.get(match.blackId);
+
+      if (match.isBye && white) {
+        white.points += 1;
+        white.hadBye = true;
+        return;
+      }
+
+      if (white && black) {
+        white.opponents.push(black.playerId);
+        black.opponents.push(white.playerId);
+
+        // Histórico de cores
+        white.colorBalance++;
+        white.colorStreak = white.lastColor === 'W' ? white.colorStreak + 1 : 1;
+        white.lastColor = 'W';
+
+        black.colorBalance--;
+        black.colorStreak = black.lastColor === 'B' ? black.colorStreak + 1 : 1;
+        black.lastColor = 'B';
+
+        if (match.result) {
+          white.gamesPlayed++;
+          black.gamesPlayed++;
+          if (match.result === '1-0') white.points += 1;
+          else if (match.result === '0-1') black.points += 1;
+          else {
+            white.points += 0.5;
+            black.points += 0.5;
+          }
+        }
+      }
+    });
+  });
+
+  // 2. Buchholz e Sonneborn-Berger
+  standingsMap.forEach((s, id) => {
+    tournament.rounds.forEach(round => {
+      round.matches.forEach(match => {
+        if (match.isBye) return;
+        
+        const isWhite = match.whiteId === id;
+        const isBlack = match.blackId === id;
+        if (!isWhite && !isBlack) return;
+
+        const opponentId = isWhite ? match.blackId : match.whiteId;
+        const opponent = standingsMap.get(opponentId);
+        if (!opponent) return;
+
+        // Buchholz: Soma dos pontos dos oponentes
+        s.buchholz += opponent.points;
+
+        // Sonneborn-Berger
+        if (match.result) {
+          const won = (isWhite && match.result === '1-0') || (isBlack && match.result === '0-1');
+          const draw = match.result === '0.5-0.5';
+          if (won) s.sonnebornBerger += opponent.points;
+          else if (draw) s.sonnebornBerger += (opponent.points * 0.5);
+        }
+      });
+    });
+  });
+
+  // 3. Ordenação com Desempates
+  return Array.from(standingsMap.values()).sort((a, b) => {
+    // 1. Pontos
+    if (b.points !== a.points) return b.points - a.points;
+    // 2. Buchholz
+    if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
+    // 3. Sonneborn-Berger
+    if (b.sonnebornBerger !== a.sonnebornBerger) return b.sonnebornBerger - a.sonnebornBerger;
+    
+    // 4. Confronto Direto (se houver)
+    const match = findMatchBetween(tournament, a.playerId, b.playerId);
+    if (match && match.result) {
+      const aWon = (match.whiteId === a.playerId && match.result === '1-0') || (match.blackId === a.playerId && match.result === '0-1');
+      const bWon = (match.whiteId === b.playerId && match.result === '1-0') || (match.blackId === b.playerId && match.result === '0-1');
+      if (aWon) return -1;
+      if (bWon) return 1;
+    }
+
+    // 5. Rating
+    const pA = allPlayers.find(p => p.id === a.playerId);
+    const pB = allPlayers.find(p => p.id === b.playerId);
+    return (pB?.rating || 0) - (pA?.rating || 0);
+  });
+}
+
+function findMatchBetween(tournament: Tournament, id1: string, id2: string): Match | null {
+  for (const round of tournament.rounds) {
+    for (const match of round.matches) {
+      if ((match.whiteId === id1 && match.blackId === id2) || (match.whiteId === id2 && match.blackId === id1)) {
+        return match;
+      }
+    }
+  }
+  return null;
+}
+
+export function generateNextRound(tournament: Tournament, allPlayers: Player[]): Round {
+  const standings = calculateStandings(tournament, allPlayers);
+  const isFirstRound = tournament.rounds.length === 0;
+  
+  let playersToPair = [...standings];
+  const matches: Match[] = [];
+
+  // 1. Lógica de BYE
+  if (playersToPair.length % 2 !== 0) {
+    for (let i = playersToPair.length - 1; i >= 0; i--) {
+      if (!playersToPair[i].hadBye) {
+        const byePlayer = playersToPair.splice(i, 1)[0];
+        matches.push({
+          id: crypto.randomUUID(),
+          whiteId: byePlayer.playerId,
+          blackId: 'BYE',
+          result: '1-0',
+          isBye: true
+        });
+        break;
+      }
+    }
+  }
+
+  // 2. Pareamento
+  if (isFirstRound) {
+    // Metade superior vs Metade inferior (1 vs 5, 2 vs 6...)
+    const half = playersToPair.length / 2;
+    for (let i = 0; i < half; i++) {
+      const p1 = playersToPair[i];
+      const p2 = playersToPair[i + half];
+      const { white, black } = decideColors(p1, p2, true);
+      matches.push({
+        id: crypto.randomUUID(),
+        whiteId: white.playerId,
+        blackId: black.playerId,
+        result: null
+      });
+    }
+  } else {
+    // Sistema Suíço Padrão
+    const pairedIds = new Set<string>();
+    const playedPairs = new Set<string>();
+    tournament.rounds.forEach(r => r.matches.forEach(m => {
+      if (!m.isBye) {
+        playedPairs.add(`${m.whiteId}-${m.blackId}`);
+        playedPairs.add(`${m.blackId}-${m.whiteId}`);
+      }
+    }));
+
+    for (let i = 0; i < playersToPair.length; i++) {
+      const p1 = playersToPair[i];
+      if (pairedIds.has(p1.playerId)) continue;
+
+      let found = false;
+      for (let j = i + 1; j < playersToPair.length; j++) {
+        const p2 = playersToPair[j];
+        if (pairedIds.has(p2.playerId)) continue;
+
+        if (!playedPairs.has(`${p1.playerId}-${p2.playerId}`)) {
+          const { white, black } = decideColors(p1, p2, false);
+          matches.push({ id: crypto.randomUUID(), whiteId: white.playerId, blackId: black.playerId, result: null });
+          pairedIds.add(p1.playerId);
+          pairedIds.add(p2.playerId);
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        for (let j = i + 1; j < playersToPair.length; j++) {
+          const p2 = playersToPair[j];
+          if (pairedIds.has(p2.playerId)) continue;
+          const { white, black } = decideColors(p1, p2, false);
+          matches.push({ id: crypto.randomUUID(), whiteId: white.playerId, blackId: black.playerId, result: null });
+          pairedIds.add(p1.playerId);
+          pairedIds.add(p2.playerId);
+          break;
+        }
+      }
+    }
+  }
+
+  return { number: tournament.rounds.length + 1, matches };
+}
+
+function decideColors(p1: Standing, p2: Standing, isFirstRound: boolean): { white: Standing, black: Standing } {
+  if (isFirstRound) {
+    // Alterna brancas/pretas na primeira rodada baseado na posição
+    return (p1.playerName.length % 2 === 0) ? { white: p1, black: p2 } : { white: p2, black: p1 };
+  }
+
+  if (p1.lastColor === 'W' && p1.colorStreak >= 2) return { white: p2, black: p1 };
+  if (p1.lastColor === 'B' && p1.colorStreak >= 2) return { white: p1, black: p2 };
+  if (p2.lastColor === 'W' && p2.colorStreak >= 2) return { white: p1, black: p2 };
+  if (p2.lastColor === 'B' && p2.colorStreak >= 2) return { white: p2, black: p1 };
+
+  if (p1.colorBalance > p2.colorBalance) return { white: p2, black: p1 };
+  if (p1.colorBalance < p2.colorBalance) return { white: p1, black: p2 };
+
+  return p1.lastColor === 'W' ? { white: p2, black: p1 } : { white: p1, black: p2 };
+}
+--- INICIO DE: src/lib/utils.ts ---
+import type { ClassValue } from 'clsx';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+--- INICIO DE: src/main.ts ---
+import './global.css';
+
+import { createPinia } from 'pinia';
+import { createApp } from 'vue';
+
+import App from './App.vue';
+import router from './router';
+
+const app = createApp(App);
+
+app.use(createPinia());
+app.use(router);
+
+app.mount('#app');
+--- INICIO DE: src/router/index.ts ---
+import { createRouter, createWebHistory } from 'vue-router';
+import PlayersView from '@/views/PlayersView.vue';
+import TournamentsView from '@/views/TournamentsView.vue';
+import TournamentDetailView from '@/views/TournamentDetailView.vue';
+import BackupView from '@/views/BackupView.vue';
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', redirect: '/tournaments' },
+    { path: '/players', name: 'players', component: PlayersView },
+    { path: '/tournaments', name: 'tournaments', component: TournamentsView },
+    { path: '/tournaments/:id', name: 'tournament-detail', component: TournamentDetailView },
+    { path: '/backup', name: 'backup', component: BackupView },
+  ],
+});
+
+export default router;
+--- INICIO DE: src/stores/chessStore.ts ---
+import { defineStore } from 'pinia';
+import { ref, watch } from 'vue';
+import type { Player, Tournament } from '@/types/chess';
+
+export const useChessStore = defineStore('chess', () => {
+  const players = ref<Player[]>(JSON.parse(localStorage.getItem('chess_players') || '[]'));
+  const tournaments = ref<Tournament[]>(JSON.parse(localStorage.getItem('chess_tournaments') || '[]'));
+
+  watch(players, (newPlayers) => {
+    localStorage.setItem('chess_players', JSON.stringify(newPlayers));
+  }, { deep: true });
+
+  watch(tournaments, (newTournaments) => {
+    localStorage.setItem('chess_tournaments', JSON.stringify(newTournaments));
+  }, { deep: true });
+
+  const addPlayer = (player: Omit<Player, 'id'>) => {
+    players.value.push({
+      ...player,
+      id: crypto.randomUUID()
+    });
+  };
+
+  const deletePlayer = (id: string) => {
+    players.value = players.value.filter(p => p.id !== id);
+  };
+
+  const addTournament = (tournament: Omit<Tournament, 'id' | 'rounds' | 'status'>) => {
+    tournaments.value.push({
+      ...tournament,
+      id: crypto.randomUUID(),
+      rounds: [],
+      status: 'planned'
+    });
+  };
+
+  const updateTournament = (updated: Tournament) => {
+    const index = tournaments.value.findIndex(t => t.id === updated.id);
+    if (index !== -1) {
+      tournaments.value[index] = updated;
+    }
+  };
+
+  const deleteTournament = (id: string) => {
+    tournaments.value = tournaments.value.filter(t => t.id !== id);
+  };
+
+  const importAllData = (data: { players: Player[], tournaments: Tournament[] }) => {
+    if (Array.isArray(data.players)) players.value = data.players;
+    if (Array.isArray(data.tournaments)) tournaments.value = data.tournaments;
+  };
+
+  return {
+    players,
+    tournaments,
+    addPlayer,
+    deletePlayer,
+    addTournament,
+    updateTournament,
+    deleteTournament,
+    importAllData
+  };
+});
+--- INICIO DE: src/types/chess.ts ---
+export interface Player {
+  id: string;
+  name: string;
+  rating: number;
+}
+
+export interface Match {
+  id: string;
+  whiteId: string;
+  blackId: string;
+  result: '1-0' | '0-1' | '0.5-0.5' | null;
+  isBye?: boolean;
+}
+
+export interface Round {
+  number: number;
+  matches: Match[];
+}
+
+export interface Tournament {
+  id: string;
+  name: string;
+  date: string;
+  playerIds: string[];
+  rounds: Round[];
+  status: 'planned' | 'active' | 'finished';
+}
+
+export interface Standing {
+  playerId: string;
+  playerName: string;
+  points: number;
+  buchholz: number;
+  sonnebornBerger: number;
+  gamesPlayed: number;
+  colorBalance: number;
+  lastColor: 'W' | 'B' | null;
+  colorStreak: number;
+  hadBye: boolean;
+  opponents: string[]; // Lista de IDs dos oponentes enfrentados
+}
+--- INICIO DE: src/views/BackupView.vue ---
+<script setup lang="ts">
+import { ref } from 'vue';
+import { useChessStore } from '@/stores/chessStore';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Download, Upload, Database, AlertTriangle, Info } from 'lucide-vue-next';
+import { toast } from 'vue-sonner';
+
+const store = useChessStore();
+const fileInput = ref<HTMLInputElement | null>(null);
+
+const exportData = () => {
+  const data = {
+    players: store.players,
+    tournaments: store.tournaments,
+    exportDate: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chess-manager-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success('Dados exportados com sucesso!');
+};
+
+const triggerImport = () => {
+  fileInput.value?.click();
+};
+
+const importData = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const content = e.target?.result as string;
+      const data = JSON.parse(content);
+      
+      if (data.players || data.tournaments) {
+        store.importAllData(data);
+        toast.success('Dados importados com sucesso!');
+      } else {
+        toast.error('Formato de arquivo inválido.');
+      }
+    } catch (err) {
+      toast.error('Erro ao ler o arquivo JSON.');
+    }
+  };
+  reader.readAsText(file);
+  target.value = '';
+};
+</script>
+
+<template>
+  <div class="container max-w-2xl mx-auto p-6 space-y-8">
+    <div class="space-y-2">
+      <h1 class="text-3xl font-bold">Gestão de Dados</h1>
+      <p class="text-muted-foreground">Exporte ou restaure seus dados do ChessManager.</p>
+    </div>
+
+    <div class="grid gap-6">
+      <Card class="border-primary/20 shadow-sm">
+        <CardHeader>
+          <CardTitle class="flex items-center gap-2">
+            <Database class="w-5 h-5 text-primary" />
+            Backup Local
+          </CardTitle>
+          <CardDescription>
+            Seus dados são armazenados apenas no seu navegador. Recomendamos exportar um backup regularmente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-6">
+          <div class="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg border">
+            <div class="text-center">
+              <div class="text-2xl font-bold">{{ store.players.length }}</div>
+              <div class="text-xs text-muted-foreground uppercase tracking-wider">Jogadores</div>
+            </div>
+            <div class="text-center border-l">
+              <div class="text-2xl font-bold">{{ store.tournaments.length }}</div>
+              <div class="text-xs text-muted-foreground uppercase tracking-wider">Torneios</div>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3">
+            <Button class="flex-1" @click="exportData">
+              <Download class="w-4 h-4 mr-2" />
+              Exportar Backup (.json)
+            </Button>
+            <Button variant="outline" class="flex-1" @click="triggerImport">
+              <Upload class="w-4 h-4 mr-2" />
+              Restaurar Backup
+            </Button>
+            <input type="file" ref="fileInput" class="hidden" accept=".json" @change="importData" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card class="bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900">
+        <CardHeader class="pb-2">
+          <CardTitle class="text-amber-800 dark:text-amber-400 flex items-center gap-2 text-base">
+            <AlertTriangle class="w-4 h-4" />
+            Atenção ao Restaurar
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p class="text-sm text-amber-700 dark:text-amber-500">
+            Ao importar um arquivo de backup, os dados atuais do seu navegador serão **substituídos** pelos dados do arquivo. Certifique-se de que o arquivo é válido.
+          </p>
+        </CardContent>
+      </Card>
+
+      <div class="flex items-start gap-3 p-4 text-sm text-muted-foreground bg-muted/30 rounded-lg">
+        <Info class="w-4 h-4 mt-0.5 shrink-0" />
+        <p>
+          O ChessManager não utiliza servidores para salvar seus dados por padrão. Isso garante sua privacidade, mas exige que você cuide dos seus próprios backups.
+        </p>
+      </div>
+    </div>
+  </div>
+</template>
+--- INICIO DE: src/views/PlayersView.vue ---
+<script setup lang="ts">
+import { ref } from 'vue';
+import { useChessStore } from '@/stores/chessStore';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { UserPlus, Trash2, Users, Download, Upload, Database } from 'lucide-vue-next';
+import { toast } from 'vue-sonner';
+
+const store = useChessStore();
+const newPlayerName = ref('');
+const newPlayerRating = ref(1200);
+const bulkPlayersText = ref('');
+const fileInput = ref<HTMLInputElement | null>(null);
+
+const handleAddPlayer = () => {
+  if (!newPlayerName.value.trim()) return;
+  store.addPlayer({
+    name: newPlayerName.value,
+    rating: newPlayerRating.value
+  });
+  newPlayerName.value = '';
+  newPlayerRating.value = 1200;
+  toast.success('Jogador adicionado com sucesso!');
+};
+
+const handleBulkAdd = () => {
+  const lines = bulkPlayersText.value.split('\n');
+  let addedCount = 0;
+
+  lines.forEach(line => {
+    const parts = line.split(',');
+    if (parts.length >= 1) {
+      const name = parts[0].trim();
+      if (!name) return;
+      
+      let rating = 1200;
+      if (parts.length >= 2) {
+        const parsedRating = parseInt(parts[1].trim());
+        if (!isNaN(parsedRating)) {
+          rating = parsedRating;
+        }
+      }
+      
+      store.addPlayer({ name, rating });
+      addedCount++;
+    }
+  });
+
+  if (addedCount > 0) {
+    bulkPlayersText.value = '';
+    toast.success(`${addedCount} jogadores adicionados com sucesso!`);
+  }
+};
+</script>
+
+<template>
+  <div class="container mx-auto p-6 space-y-8">
+    <div class="flex justify-between items-center">
+      <h1 class="text-3xl font-bold">Jogadores</h1>
+    </div>
+
+    <div class="grid gap-8">
+      <div class="lg:col-span-2 space-y-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Adicionar Jogadores</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs default-value="single" class="w-full">
+              <TabsList class="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="single">Individual</TabsTrigger>
+                <TabsTrigger value="bulk">Em Lote (Lista)</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="single">
+                <form @submit.prevent="handleAddPlayer" class="flex gap-4 items-end">
+                  <div class="flex-1 space-y-2">
+                    <label class="text-sm font-medium">Nome</label>
+                    <Input v-model="newPlayerName" placeholder="Nome do jogador" />
+                  </div>
+                  <div class="w-32 space-y-2">
+                    <label class="text-sm font-medium">Rating</label>
+                    <Input v-model.number="newPlayerRating" type="number" />
+                  </div>
+                  <Button type="submit">
+                    <UserPlus class="w-4 h-4 mr-2" />
+                    Adicionar
+                  </Button>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="bulk" class="space-y-4">
+                <div class="space-y-2">
+                  <label class="text-sm font-medium">Cole a lista (Nome, Rating)</label>
+                  <Textarea 
+                    v-model="bulkPlayersText" 
+                    placeholder="Exemplo:&#10;Iann, 900&#10;Gustavo, 600" 
+                    class="min-h-[150px]"
+                  />
+                </div>
+                <Button @click="handleBulkAdd" class="w-full">
+                  <Users class="w-4 h-4 mr-2" />
+                  Adicionar Lista
+                </Button>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent class="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Rating</TableHead>
+                  <TableHead class="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="player in store.players" :key="player.id">
+                  <TableCell class="font-medium">{{ player.name }}</TableCell>
+                  <TableCell>{{ player.rating }}</TableCell>
+                  <TableCell class="text-right">
+                    <Button variant="ghost" size="icon" @click="store.deletePlayer(player.id)">
+                      <Trash2 class="w-4 h-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                <TableRow v-if="store.players.length === 0">
+                  <TableCell colspan="3" class="text-center text-muted-foreground py-8">
+                    Nenhum jogador cadastrado.
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  </div>
+</template>
+--- INICIO DE: src/views/TournamentDetailView.vue ---
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useChessStore } from '@/stores/chessStore';
+import { calculateStandings, generateNextRound } from '@/lib/chess-logic';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { ChevronLeft, Play, CheckCircle2, FastForward, Trophy, Info, AlertCircle } from 'lucide-vue-next';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'vue-sonner';
+
+const route = useRoute();
+const router = useRouter();
+const store = useChessStore();
+
+const tournament = computed(() => store.tournaments.find(t => t.id === route.params.id));
+const standings = computed(() => tournament.value ? calculateStandings(tournament.value, store.players) : []);
+
+const currentRoundIdx = computed(() => tournament.value ? tournament.value.rounds.length - 1 : -1);
+
+const isRoundFinished = (roundIdx: number) => {
+  if (!tournament.value || roundIdx < 0) return false;
+  return tournament.value.rounds[roundIdx].matches.every(m => m.result !== null);
+};
+
+const canGenerateNext = computed(() => {
+  if (!tournament.value || tournament.value.status !== 'active') return false;
+  return isRoundFinished(currentRoundIdx.value);
+});
+
+const getPlayerName = (id: string) => {
+  if (id === 'BYE') return 'FOLGA (BYE)';
+  return store.players.find(p => p.id === id)?.name || 'Desconhecido';
+};
+
+const startTournament = () => {
+  if (!tournament.value) return;
+  const firstRound = generateNextRound(tournament.value, store.players);
+  store.updateTournament({
+    ...tournament.value,
+    status: 'active',
+    rounds: [firstRound]
+  });
+  toast.success('Torneio iniciado!');
+};
+
+const updateResult = (roundIndex: number, matchId: string, result: any) => {
+  if (!tournament.value) return;
+  const newRounds = JSON.parse(JSON.stringify(tournament.value.rounds));
+  const match = newRounds[roundIndex].matches.find((m: any) => m.id === matchId);
+  if (match) {
+    match.result = result;
+    store.updateTournament({ ...tournament.value, rounds: newRounds });
+  }
+};
+
+const nextRound = () => {
+  if (!canGenerateNext.value) {
+    toast.error('Finalize todos os resultados da rodada atual primeiro.');
+    return;
+  }
+  const next = generateNextRound(tournament.value!, store.players);
+  store.updateTournament({
+    ...tournament.value!,
+    rounds: [...tournament.value!.rounds, next]
+  });
+  toast.success(`Rodada ${next.number} gerada!`);
+};
+
+const finishTournament = () => {
+  if (!canGenerateNext.value) {
+    toast.error('Finalize todos os resultados antes de encerrar.');
+    return;
+  }
+  store.updateTournament({ ...tournament.value!, status: 'finished' });
+  toast.success('Torneio finalizado com sucesso!');
+};
+</script>
+
+<template>
+  <div v-if="tournament" class="container mx-auto p-6 space-y-6">
+    <!-- Header com Ações -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 rounded-xl border shadow-sm sticky top-0 z-10">
+      <div class="flex items-center gap-4">
+        <Button variant="ghost" size="icon" @click="router.push('/tournaments')">
+          <ChevronLeft class="w-4 h-4" />
+        </Button>
+        <div>
+          <h1 class="text-xl font-bold leading-tight">{{ tournament.name }}</h1>
+          <div class="flex items-center gap-2 mt-1">
+            <Badge :variant="tournament.status === 'active' ? 'default' : 'secondary'" class="text-[10px] h-5">
+              {{ tournament.status === 'active' ? 'Em Andamento' : tournament.status === 'finished' ? 'Finalizado' : 'Planejado' }}
+            </Badge>
+            <span class="text-xs text-muted-foreground">{{ tournament.date }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <template v-if="tournament.status === 'planned'">
+          <Button @click="startTournament" size="sm">
+            <Play class="w-4 h-4 mr-2" />
+            Iniciar Torneio
+          </Button>
+        </template>
+        
+        <template v-if="tournament.status === 'active'">
+          <div v-if="!canGenerateNext" class="hidden lg:flex items-center gap-2 text-xs text-orange-600 bg-orange-50 px-3 py-1.5 rounded-md border border-orange-100 mr-2">
+            <AlertCircle class="w-3.5 h-3.5" />
+            Aguardando resultados da Rodada {{ tournament.rounds.length }}
+          </div>
+          
+          <Button variant="outline" size="sm" @click="nextRound" :disabled="!canGenerateNext">
+            <FastForward class="w-4 h-4 mr-2" />
+            Próxima Rodada
+          </Button>
+          <Button size="sm" @click="finishTournament" :disabled="!canGenerateNext">
+            <CheckCircle2 class="w-4 h-4 mr-2" />
+            Finalizar
+          </Button>
+        </template>
+      </div>
+    </div>
+
+    <div v-if="tournament.status === 'planned'" class="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-xl space-y-6 bg-card/50">
+      <div class="bg-primary/10 p-4 rounded-full">
+        <Play class="w-12 h-12 text-primary" />
+      </div>
+      <div class="text-center space-y-2">
+        <h2 class="text-xl font-semibold">Pronto para começar?</h2>
+        <p class="text-muted-foreground max-w-xs">O sistema irá gerar os pareamentos iniciais (Metade Superior vs Inferior).</p>
+      </div>
+      <Button size="lg" @click="startTournament" class="px-8">
+        Iniciar Torneio Agora
+      </Button>
+    </div>
+
+    <Tabs v-else default-value="rounds" class="w-full">
+      <TabsList class="grid w-full grid-cols-2 mb-6">
+        <TabsTrigger value="rounds">Rodadas e Partidas</TabsTrigger>
+        <TabsTrigger value="standings">Classificação Geral</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="rounds" class="space-y-8">
+        <div v-for="(round, rIdx) in [...tournament.rounds].reverse()" :key="round.number" class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold">Rodada {{ round.number }}</h3>
+            <Badge v-if="isRoundFinished(tournament.rounds.length - 1 - rIdx)" variant="outline" class="bg-green-500/10 text-green-600 border-green-200 text-[10px]">
+              Concluída
+            </Badge>
+          </div>
+          
+          <Card class="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow class="bg-muted/50">
+                  <TableHead class="w-[40%]">Brancas</TableHead>
+                  <TableHead class="text-center w-[20%]">Resultado</TableHead>
+                  <TableHead class="text-right w-[40%]">Pretas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="match in round.matches" :key="match.id" :class="match.isBye ? 'bg-primary/5' : ''">
+                  <TableCell class="font-medium py-3">
+                    <div class="flex items-center gap-2">
+                      <div class="w-2 h-2 rounded-full bg-white border border-gray-300" title="Brancas"></div>
+                      <span class="text-sm">{{ getPlayerName(match.whiteId) }}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell class="text-center">
+                    <div v-if="match.isBye" class="text-xs font-bold text-primary">BYE (+1.0)</div>
+                    <Select 
+                      v-else
+                      :model-value="match.result || 'null'" 
+                      @update:model-value="(val) => tournament && updateResult(tournament.rounds.length - 1 - rIdx, match.id, val === 'null' ? null : val)"
+                      :disabled="tournament.status === 'finished'"
+                    >
+                      <SelectTrigger class="w-24 mx-auto h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="null">-</SelectItem>
+                        <SelectItem value="1-0">1 - 0</SelectItem>
+                        <SelectItem value="0.5-0.5">½ - ½</SelectItem>
+                        <SelectItem value="0-1">0 - 1</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell class="text-right font-medium py-3">
+                    <div class="flex items-center justify-end gap-2">
+                      <span class="text-sm">{{ getPlayerName(match.blackId) }}</span>
+                      <div class="w-2 h-2 rounded-full bg-black" title="Pretas"></div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="standings">
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow class="bg-muted/50">
+                <TableHead class="w-16 text-center">Pos</TableHead>
+                <TableHead>Jogador</TableHead>
+                <TableHead class="text-center">Pontos</TableHead>
+                <TableHead class="text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    BH
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger><Info class="w-3 h-3" /></TooltipTrigger>
+                        <TooltipContent>Buchholz: Soma dos pontos dos oponentes</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </TableHead>
+                <TableHead class="text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    SB
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger><Info class="w-3 h-3" /></TooltipTrigger>
+                        <TooltipContent>Sonneborn-Berger: Soma dos pontos dos oponentes derrotados + metade dos empatados</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </TableHead>
+                <TableHead class="text-center">Saldo Cores</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="(s, idx) in standings" :key="s.playerId" :class="idx === 0 ? 'bg-yellow-500/5' : ''">
+                <TableCell class="text-center">
+                  <div v-if="idx === 0" class="flex justify-center"><Trophy class="w-5 h-5 text-yellow-500" /></div>
+                  <span v-else class="font-bold text-muted-foreground text-sm">{{ idx + 1 }}º</span>
+                </TableCell>
+                <TableCell class="font-medium text-sm">{{ s.playerName }}</TableCell>
+                <TableCell class="text-center">
+                  <Badge variant="secondary" class="text-sm font-bold px-2">{{ s.points }}</Badge>
+                </TableCell>
+                <TableCell class="text-center font-medium text-sm">{{ s.buchholz }}</TableCell>
+                <TableCell class="text-center font-medium text-sm">{{ s.sonnebornBerger }}</TableCell>
+                <TableCell class="text-center text-sm">
+                  <span :class="s.colorBalance > 0 ? 'text-blue-600' : s.colorBalance < 0 ? 'text-orange-600' : ''">
+                    {{ s.colorBalance > 0 ? '+' : '' }}{{ s.colorBalance }}
+                  </span>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </Card>
+      </TabsContent>
+    </Tabs>
+  </div>
+</template>
+--- INICIO DE: src/views/TournamentsView.vue ---
+<script setup lang="ts">
+import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useChessStore } from '@/stores/chessStore';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Trophy, Calendar, Users, Trash2, UserPlus, UserMinus, Search, Plus, X, ArrowLeft } from 'lucide-vue-next';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+const store = useChessStore();
+const router = useRouter();
+
+const showForm = ref(false);
+const newName = ref('');
+const selectedPlayerIds = ref<string[]>([]);
+const searchQuery = ref('');
+
+const availablePlayers = computed(() => {
+  return store.players.filter(p => 
+    !selectedPlayerIds.value.includes(p.id) && 
+    p.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+  );
+});
+
+const addedPlayers = computed(() => {
+  return store.players.filter(p => selectedPlayerIds.value.includes(p.id));
+});
+
+const addPlayer = (id: string) => {
+  if (!selectedPlayerIds.value.includes(id)) {
+    selectedPlayerIds.value.push(id);
+  }
+};
+
+const removePlayer = (id: string) => {
+  selectedPlayerIds.value = selectedPlayerIds.value.filter(playerId => playerId !== id);
+};
+
+const handleCreate = () => {
+  if (!newName.value || selectedPlayerIds.value.length < 2) return;
+  store.addTournament({
+    name: newName.value,
+    date: new Date().toISOString().split('T')[0],
+    playerIds: [...selectedPlayerIds.value]
+  });
+  newName.value = '';
+  selectedPlayerIds.value = [];
+  showForm.value = false;
+};
+
+const getStatusLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    planned: 'Planejado',
+    active: 'Em Andamento',
+    finished: 'Finalizado'
+  };
+  return labels[status] || status;
+};
+</script>
+
+<template>
+  <div class="container mx-auto p-6 space-y-8">
+    <div class="flex justify-between items-center">
+      <h1 class="text-3xl font-bold">{{ showForm ? 'Novo Torneio' : 'Torneios' }}</h1>
+      <Button @click="showForm = !showForm" :variant="showForm ? 'ghost' : 'default'">
+        <component :is="showForm ? ArrowLeft : Plus" class="w-4 h-4 mr-2" />
+        {{ showForm ? 'Voltar para Lista' : 'Novo Torneio' }}
+      </Button>
+    </div>
+
+    <!-- Formulário de Criação -->
+    <div v-if="showForm" class="animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <Card class="border-primary/20 shadow-lg">
+        <CardHeader>
+          <CardTitle>Configurações do Torneio</CardTitle>
+        </CardHeader>
+        <CardContent class="space-y-6">
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Nome do Torneio</label>
+            <Input v-model="newName" placeholder="Ex: Torneio de Verão 2024" />
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Jogadores Disponíveis -->
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <label class="text-sm font-semibold flex items-center gap-2">
+                  Jogadores Disponíveis
+                  <Badge variant="secondary">{{ availablePlayers.length }}</Badge>
+                </label>
+                <div class="relative w-40">
+                  <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input v-model="searchQuery" placeholder="Buscar..." class="pl-8 h-8 text-xs" />
+                </div>
+              </div>
+              <Card class="bg-muted/30">
+                <ScrollArea class="h-[350px] p-2">
+                  <div v-if="availablePlayers.length === 0" class="text-center py-10 text-muted-foreground text-sm">
+                    Nenhum jogador disponível.
+                  </div>
+                  <div v-for="player in availablePlayers" :key="player.id" 
+                    class="flex items-center justify-between p-2 hover:bg-background rounded-md transition-colors mb-1 border border-transparent hover:border-border">
+                    <div class="flex flex-col">
+                      <span class="text-sm font-medium">{{ player.name }}</span>
+                      <span class="text-xs text-muted-foreground">Rating: {{ player.rating }}</span>
+                    </div>
+                    <Button size="sm" variant="ghost" @click="addPlayer(player.id)" class="h-8 w-8 p-0 text-primary">
+                      <UserPlus class="h-4 w-4" />
+                    </Button>
+                  </div>
+                </ScrollArea>
+              </Card>
+            </div>
+
+            <!-- Jogadores Adicionados -->
+            <div class="space-y-3">
+              <label class="text-sm font-semibold flex items-center gap-2">
+                Jogadores Adicionados
+                <Badge variant="default">{{ addedPlayers.length }}</Badge>
+              </label>
+              <Card class="border-primary/20 bg-primary/5">
+                <ScrollArea class="h-[350px] p-2">
+                  <div v-if="addedPlayers.length === 0" class="text-center py-10 text-muted-foreground text-sm">
+                    Adicione pelo menos 2 jogadores.
+                  </div>
+                  <div v-for="player in addedPlayers" :key="player.id" 
+                    class="flex items-center justify-between p-2 bg-background rounded-md shadow-sm mb-1 border border-border">
+                    <div class="flex flex-col">
+                      <span class="text-sm font-medium">{{ player.name }}</span>
+                      <span class="text-xs text-muted-foreground">Rating: {{ player.rating }}</span>
+                    </div>
+                    <Button size="sm" variant="ghost" @click="removePlayer(player.id)" class="h-8 w-8 p-0 text-destructive">
+                      <UserMinus class="h-4 w-4" />
+                    </Button>
+                  </div>
+                </ScrollArea>
+              </Card>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter class="border-t pt-6">
+          <Button @click="handleCreate" :disabled="!newName || selectedPlayerIds.length < 2" class="w-full md:w-auto">
+            <Trophy class="w-4 h-4 mr-2" />
+            Criar Torneio com {{ selectedPlayerIds.length }} Jogadores
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+
+    <!-- Listagem de Torneios -->
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+      <Card v-for="t in store.tournaments" :key="t.id" class="hover:border-primary transition-all cursor-pointer group" @click="router.push(`/tournaments/${t.id}`)">
+        <CardHeader>
+          <div class="flex justify-between items-start">
+            <CardTitle class="group-hover:text-primary transition-colors">{{ t.name }}</CardTitle>
+            <Badge :variant="t.status === 'active' ? 'default' : 'secondary'">
+              {{ getStatusLabel(t.status) }}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent class="space-y-2 text-sm text-muted-foreground">
+          <div class="flex items-center">
+            <Calendar class="w-4 h-4 mr-2" />
+            {{ t.date }}
+          </div>
+          <div class="flex items-center">
+            <Users class="w-4 h-4 mr-2" />
+            {{ t.playerIds.length }} Jogadores
+          </div>
+        </CardContent>
+        <CardFooter class="justify-end border-t pt-4">
+          <Button variant="ghost" size="icon" @click.stop="store.deleteTournament(t.id)" class="hover:bg-destructive/10">
+            <Trash2 class="w-4 h-4 text-destructive" />
+          </Button>
+        </CardFooter>
+      </Card>
+      
+      <div v-if="store.tournaments.length === 0" class="col-span-full py-20 text-center border-2 border-dashed rounded-xl bg-muted/20">
+        <Trophy class="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+        <h3 class="text-lg font-medium">Nenhum torneio encontrado</h3>
+        <p class="text-muted-foreground mb-6">Comece criando seu primeiro torneio de xadrez.</p>
+        <Button @click="showForm = true">
+          <Plus class="w-4 h-4 mr-2" />
+          Criar Primeiro Torneio
+        </Button>
+      </div>
+    </div>
+  </div>
+</template>

@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { ChevronLeft, Play, CheckCircle2, FastForward, Trophy, Info, AlertCircle } from 'lucide-vue-next';
+import { ChevronLeft, Play, CheckCircle2, FastForward, Trophy, Info, AlertCircle, Repeat } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'vue-sonner';
@@ -58,6 +58,26 @@ const updateResult = (roundIndex: number, matchId: string, result: any) => {
   }
 };
 
+const swapColors = (roundIndex: number, matchId: string) => {
+  if (!tournament.value) return;
+  const idx = roundIndex;
+  const newRounds = JSON.parse(JSON.stringify(tournament.value.rounds));
+  const match = newRounds[idx].matches.find((m: any) => m.id === matchId);
+  if (!match) return;
+
+  // swap players
+  const tmp = match.whiteId;
+  match.whiteId = match.blackId;
+  match.blackId = tmp;
+
+  // invert result if already set
+  if (match.result === '1-0') match.result = '0-1';
+  else if (match.result === '0-1') match.result = '1-0';
+
+  store.updateTournament({ ...tournament.value, rounds: newRounds });
+  toast.success('Cores trocadas com sucesso');
+};
+
 const nextRound = () => {
   if (!canGenerateNext.value) {
     toast.error('Finalize todos os resultados da rodada atual primeiro.');
@@ -76,8 +96,9 @@ const finishTournament = () => {
     toast.error('Finalize todos os resultados antes de encerrar.');
     return;
   }
-  store.updateTournament({ ...tournament.value!, status: 'finished' });
-  toast.success('Torneio finalizado com sucesso!');
+  // aplica ratings e marca o torneio como finalizado
+  store.finalizeTournament(tournament.value!.id);
+  toast.success('Torneio finalizado e ratings atualizados!');
 };
 </script>
 
@@ -173,22 +194,34 @@ const finishTournament = () => {
                   </TableCell>
                   <TableCell class="text-center">
                     <div v-if="match.isBye" class="text-xs font-bold text-primary">BYE (+1.0)</div>
-                    <Select 
-                      v-else
-                      :model-value="match.result || 'null'" 
-                      @update:model-value="(val) => tournament && updateResult(tournament.rounds.length - 1 - rIdx, match.id, val === 'null' ? null : val)"
-                      :disabled="tournament.status === 'finished'"
-                    >
-                      <SelectTrigger class="w-24 mx-auto h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="null">-</SelectItem>
-                        <SelectItem value="1-0">1 - 0</SelectItem>
-                        <SelectItem value="0.5-0.5">½ - ½</SelectItem>
-                        <SelectItem value="0-1">0 - 1</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div v-else class="flex items-center justify-center gap-2">
+                      <Select
+                        :model-value="match.result || 'null'"
+                        @update:model-value="(val) => tournament && updateResult(tournament.rounds.length - 1 - rIdx, match.id, val === 'null' ? null : val)"
+                        :disabled="tournament.status === 'finished'"
+                      >
+                        <SelectTrigger class="w-24 mx-auto h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="null">-</SelectItem>
+                          <SelectItem value="1-0">1 - 0</SelectItem>
+                          <SelectItem value="0.5-0.5">½ - ½</SelectItem>
+                          <SelectItem value="0-1">0 - 1</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Button variant="ghost" size="icon" :disabled="tournament.status === 'finished'" @click="tournament && swapColors(tournament.rounds.length - 1 - rIdx, match.id)">
+                              <Repeat class="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Trocar cores</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </TableCell>
                   <TableCell class="text-right font-medium py-3">
                     <div class="flex items-center justify-end gap-2">

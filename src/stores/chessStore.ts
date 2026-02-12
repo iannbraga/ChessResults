@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
 import type { Player, Tournament } from '@/types/chess';
+import { updateRatingsFromTournament } from '@/lib/rating';
 
 export const useChessStore = defineStore('chess', () => {
   const players = ref<Player[]>(JSON.parse(localStorage.getItem('chess_players') || '[]'));
@@ -17,7 +18,8 @@ export const useChessStore = defineStore('chess', () => {
   const addPlayer = (player: Omit<Player, 'id'>) => {
     players.value.push({
       ...player,
-      id: crypto.randomUUID()
+      id: crypto.randomUUID(),
+      rating: typeof player.rating === 'number' && Number.isFinite(player.rating) ? player.rating : 1200
     });
   };
 
@@ -41,6 +43,18 @@ export const useChessStore = defineStore('chess', () => {
     }
   };
 
+  const finalizeTournament = (tournamentId: string) => {
+    const t = tournaments.value.find(tt => tt.id === tournamentId);
+    if (!t) return;
+    if (t.status === 'finished') return;
+
+    // Only update ratings if tournament has finished matches
+    t.status = 'finished';
+    const updatedPlayers = updateRatingsFromTournament(t, players.value);
+    players.value = updatedPlayers;
+    updateTournament(t);
+  };
+
   const deleteTournament = (id: string) => {
     tournaments.value = tournaments.value.filter(t => t.id !== id);
   };
@@ -59,5 +73,6 @@ export const useChessStore = defineStore('chess', () => {
     updateTournament,
     deleteTournament,
     importAllData
+    , finalizeTournament
   };
 });
