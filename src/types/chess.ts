@@ -9,6 +9,7 @@ export interface Match {
   whiteId: string;
   blackId: string;
   result: '1-0' | '0-1' | '0.5-0.5' | null;
+  isBye?: boolean; // Indica se é um ponto automático por falta de par
 }
 
 export interface Round {
@@ -31,4 +32,8 @@ export interface Standing {
   points: number;
   buchholz: number;
   gamesPlayed: number;
+  colorBalance: number; // Brancas - Pretas
+  lastColor: 'W' | 'B' | null;
+  colorStreak: number;
+  hadBye: boolean;
 }
