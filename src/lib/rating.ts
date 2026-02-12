@@ -53,7 +53,11 @@ function processMatch(match: Match, playersMap: Map<string, Player>, deltas: Map
 export function updateRatingsFromTournament(tournament: Tournament, allPlayers: Player[]) {
   const playersMap = new Map<string, Player>();
   allPlayers.forEach(p => {
-    const safeRating = (typeof p.rating === 'number' && Number.isFinite(p.rating)) ? p.rating : 1200;
+    // Use initialPlayerRatings if available (preserves correct history when reimporting)
+    const ratingAtStart = tournament.initialPlayerRatings?.[p.id];
+    const safeRating = (typeof ratingAtStart === 'number' && Number.isFinite(ratingAtStart)) 
+      ? ratingAtStart 
+      : (typeof p.rating === 'number' && Number.isFinite(p.rating)) ? p.rating : 1200;
     playersMap.set(p.id, { ...p, rating: safeRating });
   });
 
