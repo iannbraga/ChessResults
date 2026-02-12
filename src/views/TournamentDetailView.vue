@@ -40,10 +40,19 @@ const getPlayerName = (id: string) => {
 const startTournament = () => {
   if (!tournament.value) return;
   const firstRound = generateNextRound(tournament.value, store.players);
+  
+  // Capture initial ratings
+  const initialPlayerRatings: Record<string, number> = {};
+  tournament.value.playerIds.forEach(id => {
+    const player = store.players.find(p => p.id === id);
+    initialPlayerRatings[id] = player?.rating ?? 1200;
+  });
+  
   store.updateTournament({
     ...tournament.value,
     status: 'active',
-    rounds: [firstRound]
+    rounds: [firstRound],
+    initialPlayerRatings
   });
   toast.success('Torneio iniciado!');
 };
@@ -267,6 +276,9 @@ const finishTournament = () => {
                   </div>
                 </TableHead>
                 <TableHead class="text-center">Saldo Cores</TableHead>
+                <TableHead class="text-center">Rating Inicial</TableHead>
+                <TableHead class="text-center">Rating Final</TableHead>
+                <TableHead class="text-center">Mudança</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -284,6 +296,13 @@ const finishTournament = () => {
                 <TableCell class="text-center text-sm">
                   <span :class="s.colorBalance > 0 ? 'text-blue-600' : s.colorBalance < 0 ? 'text-orange-600' : ''">
                     {{ s.colorBalance > 0 ? '+' : '' }}{{ s.colorBalance }}
+                  </span>
+                </TableCell>
+                <TableCell class="text-center font-medium text-sm">{{ s.ratingInitial }}</TableCell>
+                <TableCell class="text-center font-medium text-sm">{{ s.ratingFinal }}</TableCell>
+                <TableCell class="text-center text-sm">
+                  <span :class="s.ratingChange > 0 ? 'text-green-600' : s.ratingChange < 0 ? 'text-red-600' : ''">
+                    {{ s.ratingChange > 0 ? '+' : '' }}{{ s.ratingChange }}
                   </span>
                 </TableCell>
               </TableRow>

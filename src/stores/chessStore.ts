@@ -51,8 +51,15 @@ export const useChessStore = defineStore('chess', () => {
     // Only update ratings if tournament has finished matches
     t.status = 'finished';
     const updatedPlayers = updateRatingsFromTournament(t, players.value);
+    
+    // Capture final ratings after update
+    const finalPlayerRatings: Record<string, number> = {};
+    updatedPlayers.forEach(p => {
+      finalPlayerRatings[p.id] = p.rating;
+    });
+    
     players.value = updatedPlayers;
-    updateTournament(t);
+    updateTournament({ ...t, finalPlayerRatings });
   };
 
   const deleteTournament = (id: string) => {

@@ -24,6 +24,8 @@ export interface Tournament {
   playerIds: string[];
   rounds: Round[];
   status: 'planned' | 'active' | 'finished';
+  initialPlayerRatings?: Record<string, number>;
+  finalPlayerRatings?: Record<string, number>;
 }
 
 export interface Standing {
@@ -38,4 +40,7 @@ export interface Standing {
   colorStreak: number;
   hadBye: boolean;
   opponents: string[]; // Lista de IDs dos oponentes enfrentados
+  ratingInitial: number;
+  ratingFinal: number;
+  ratingChange: number;
 }

@@ -6,6 +6,9 @@ export function calculateStandings(tournament: Tournament, allPlayers: Player[])
   // Inicializa jogadores
   tournament.playerIds.forEach(id => {
     const player = allPlayers.find(p => p.id === id);
+    const ratingInitial = tournament.initialPlayerRatings?.[id] ?? player?.rating ?? 1200;
+    const ratingFinal = tournament.finalPlayerRatings?.[id] ?? player?.rating ?? 1200;
+    
     standingsMap.set(id, {
       playerId: id,
       playerName: player?.name || 'Desconhecido',
@@ -17,7 +20,10 @@ export function calculateStandings(tournament: Tournament, allPlayers: Player[])
       lastColor: null,
       colorStreak: 0,
       hadBye: false,
-      opponents: []
+      opponents: [],
+      ratingInitial,
+      ratingFinal,
+      ratingChange: ratingFinal - ratingInitial
     });
   });
 
