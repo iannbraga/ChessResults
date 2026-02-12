@@ -55,71 +55,15 @@ const handleBulkAdd = () => {
     toast.success(`${addedCount} jogadores adicionados com sucesso!`);
   }
 };
-
-const exportData = () => {
-  const data = {
-    players: store.players,
-    tournaments: store.tournaments,
-    exportDate: new Date().toISOString()
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `chess-manager-backup-${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast.success('Dados exportados com sucesso!');
-};
-
-const triggerImport = () => {
-  fileInput.value?.click();
-};
-
-const importData = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const content = e.target?.result as string;
-      const data = JSON.parse(content);
-      
-      if (data.players || data.tournaments) {
-        store.importAllData(data);
-        toast.success('Dados importados com sucesso!');
-      } else {
-        toast.error('Formato de arquivo inválido.');
-      }
-    } catch (err) {
-      toast.error('Erro ao ler o arquivo JSON.');
-    }
-  };
-  reader.readAsText(file);
-  target.value = ''; // Reset input
-};
 </script>
 
 <template>
   <div class="container mx-auto p-6 space-y-8">
     <div class="flex justify-between items-center">
       <h1 class="text-3xl font-bold">Jogadores</h1>
-      <div class="flex gap-2">
-        <Button variant="outline" size="sm" @click="exportData">
-          <Download class="w-4 h-4 mr-2" />
-          Exportar JSON
-        </Button>
-        <Button variant="outline" size="sm" @click="triggerImport">
-          <Upload class="w-4 h-4 mr-2" />
-          Importar JSON
-        </Button>
-        <input type="file" ref="fileInput" class="hidden" accept=".json" @change="importData" />
-      </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="grid gap-8">
       <div class="lg:col-span-2 space-y-8">
         <Card>
           <CardHeader>
@@ -194,40 +138,6 @@ const importData = (event: Event) => {
                 </TableRow>
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div class="space-y-6">
-        <Card class="bg-primary/5 border-primary/20">
-          <CardHeader>
-            <CardTitle class="flex items-center gap-2 text-lg">
-              <Database class="w-5 h-5" />
-              Backup de Dados
-            </CardTitle>
-            <CardDescription>
-              Como os dados são salvos localmente no navegador, use estas opções para não perder seu progresso ao trocar de dispositivo ou limpar o cache.
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            <div class="p-3 bg-background rounded-lg border text-sm space-y-1">
-              <div class="flex justify-between">
-                <span class="text-muted-foreground">Jogadores:</span>
-                <span class="font-bold">{{ store.players.length }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-muted-foreground">Torneios:</span>
-                <span class="font-bold">{{ store.tournaments.length }}</span>
-              </div>
-            </div>
-            <Button variant="default" class="w-full" @click="exportData">
-              <Download class="w-4 h-4 mr-2" />
-              Baixar Backup (.json)
-            </Button>
-            <Button variant="outline" class="w-full" @click="triggerImport">
-              <Upload class="w-4 h-4 mr-2" />
-              Restaurar Backup
-            </Button>
           </CardContent>
         </Card>
       </div>
