@@ -34,8 +34,6 @@ import { Trophy, Users } from 'lucide-vue-next';
     <main class="flex-1">
       <RouterView />
     </main>
-
-    <MadeWithDyad />
   </div>
 </template>
 

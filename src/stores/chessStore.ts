@@ -45,6 +45,11 @@ export const useChessStore = defineStore('chess', () => {
     tournaments.value = tournaments.value.filter(t => t.id !== id);
   };
 
+  const importAllData = (data: { players: Player[], tournaments: Tournament[] }) => {
+    if (Array.isArray(data.players)) players.value = data.players;
+    if (Array.isArray(data.tournaments)) tournaments.value = data.tournaments;
+  };
+
   return {
     players,
     tournaments,
@@ -52,6 +57,7 @@ export const useChessStore = defineStore('chess', () => {
     deletePlayer,
     addTournament,
     updateTournament,
-    deleteTournament
+    deleteTournament,
+    importAllData
   };
 });
