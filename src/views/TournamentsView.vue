@@ -5,7 +5,7 @@ import { useChessStore } from '@/stores/chessStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
-import { Trophy, Calendar, Users, Trash2, UserPlus, UserMinus, Search, Plus, X } from 'lucide-vue-next';
+import { Trophy, Calendar, Users, Trash2, UserPlus, UserMinus, Search, Plus, X, ArrowLeft } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -63,90 +63,94 @@ const getStatusLabel = (status: string) => {
 <template>
   <div class="container mx-auto p-6 space-y-8">
     <div class="flex justify-between items-center">
-      <h1 class="text-3xl font-bold">Torneios</h1>
-      <Button @click="showForm = !showForm" :variant="showForm ? 'outline' : 'default'">
-        <component :is="showForm ? X : Plus" class="w-4 h-4 mr-2" />
-        {{ showForm ? 'Cancelar' : 'Novo Torneio' }}
+      <h1 class="text-3xl font-bold">{{ showForm ? 'Novo Torneio' : 'Torneios' }}</h1>
+      <Button @click="showForm = !showForm" :variant="showForm ? 'ghost' : 'default'">
+        <component :is="showForm ? ArrowLeft : Plus" class="w-4 h-4 mr-2" />
+        {{ showForm ? 'Voltar para Lista' : 'Novo Torneio' }}
       </Button>
     </div>
 
-    <Card v-if="showForm" class="border-primary/20 shadow-lg animate-in fade-in slide-in-from-top-4 duration-300">
-      <CardHeader>
-        <CardTitle>Criar Novo Torneio</CardTitle>
-      </CardHeader>
-      <CardContent class="space-y-6">
-        <div class="space-y-2">
-          <label class="text-sm font-medium">Nome do Torneio</label>
-          <Input v-model="newName" placeholder="Ex: Torneio de Verão 2024" />
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Jogadores Disponíveis -->
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <label class="text-sm font-semibold flex items-center gap-2">
-                Jogadores Disponíveis
-                <Badge variant="secondary">{{ availablePlayers.length }}</Badge>
-              </label>
-              <div class="relative w-40">
-                <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input v-model="searchQuery" placeholder="Buscar..." class="pl-8 h-8 text-xs" />
+    <!-- Formulário de Criação -->
+    <div v-if="showForm" class="animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <Card class="border-primary/20 shadow-lg">
+        <CardHeader>
+          <CardTitle>Configurações do Torneio</CardTitle>
+        </CardHeader>
+        <CardContent class="space-y-6">
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Nome do Torneio</label>
+            <Input v-model="newName" placeholder="Ex: Torneio de Verão 2024" />
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Jogadores Disponíveis -->
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <label class="text-sm font-semibold flex items-center gap-2">
+                  Jogadores Disponíveis
+                  <Badge variant="secondary">{{ availablePlayers.length }}</Badge>
+                </label>
+                <div class="relative w-40">
+                  <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input v-model="searchQuery" placeholder="Buscar..." class="pl-8 h-8 text-xs" />
+                </div>
               </div>
+              <Card class="bg-muted/30">
+                <ScrollArea class="h-[350px] p-2">
+                  <div v-if="availablePlayers.length === 0" class="text-center py-10 text-muted-foreground text-sm">
+                    Nenhum jogador disponível.
+                  </div>
+                  <div v-for="player in availablePlayers" :key="player.id" 
+                    class="flex items-center justify-between p-2 hover:bg-background rounded-md transition-colors mb-1 border border-transparent hover:border-border">
+                    <div class="flex flex-col">
+                      <span class="text-sm font-medium">{{ player.name }}</span>
+                      <span class="text-xs text-muted-foreground">Rating: {{ player.rating }}</span>
+                    </div>
+                    <Button size="sm" variant="ghost" @click="addPlayer(player.id)" class="h-8 w-8 p-0 text-primary">
+                      <UserPlus class="h-4 w-4" />
+                    </Button>
+                  </div>
+                </ScrollArea>
+              </Card>
             </div>
-            <Card class="bg-muted/30">
-              <ScrollArea class="h-[300px] p-2">
-                <div v-if="availablePlayers.length === 0" class="text-center py-10 text-muted-foreground text-sm">
-                  Nenhum jogador disponível.
-                </div>
-                <div v-for="player in availablePlayers" :key="player.id" 
-                  class="flex items-center justify-between p-2 hover:bg-background rounded-md transition-colors mb-1 border border-transparent hover:border-border">
-                  <div class="flex flex-col">
-                    <span class="text-sm font-medium">{{ player.name }}</span>
-                    <span class="text-xs text-muted-foreground">Rating: {{ player.rating }}</span>
-                  </div>
-                  <Button size="sm" variant="ghost" @click="addPlayer(player.id)" class="h-8 w-8 p-0 text-primary">
-                    <UserPlus class="h-4 w-4" />
-                  </Button>
-                </div>
-              </ScrollArea>
-            </Card>
-          </div>
 
-          <!-- Jogadores Adicionados -->
-          <div class="space-y-3">
-            <label class="text-sm font-semibold flex items-center gap-2">
-              Jogadores Adicionados
-              <Badge variant="default">{{ addedPlayers.length }}</Badge>
-            </label>
-            <Card class="border-primary/20 bg-primary/5">
-              <ScrollArea class="h-[300px] p-2">
-                <div v-if="addedPlayers.length === 0" class="text-center py-10 text-muted-foreground text-sm">
-                  Adicione pelo menos 2 jogadores.
-                </div>
-                <div v-for="player in addedPlayers" :key="player.id" 
-                  class="flex items-center justify-between p-2 bg-background rounded-md shadow-sm mb-1 border border-border">
-                  <div class="flex flex-col">
-                    <span class="text-sm font-medium">{{ player.name }}</span>
-                    <span class="text-xs text-muted-foreground">Rating: {{ player.rating }}</span>
+            <!-- Jogadores Adicionados -->
+            <div class="space-y-3">
+              <label class="text-sm font-semibold flex items-center gap-2">
+                Jogadores Adicionados
+                <Badge variant="default">{{ addedPlayers.length }}</Badge>
+              </label>
+              <Card class="border-primary/20 bg-primary/5">
+                <ScrollArea class="h-[350px] p-2">
+                  <div v-if="addedPlayers.length === 0" class="text-center py-10 text-muted-foreground text-sm">
+                    Adicione pelo menos 2 jogadores.
                   </div>
-                  <Button size="sm" variant="ghost" @click="removePlayer(player.id)" class="h-8 w-8 p-0 text-destructive">
-                    <UserMinus class="h-4 w-4" />
-                  </Button>
-                </div>
-              </ScrollArea>
-            </Card>
+                  <div v-for="player in addedPlayers" :key="player.id" 
+                    class="flex items-center justify-between p-2 bg-background rounded-md shadow-sm mb-1 border border-border">
+                    <div class="flex flex-col">
+                      <span class="text-sm font-medium">{{ player.name }}</span>
+                      <span class="text-xs text-muted-foreground">Rating: {{ player.rating }}</span>
+                    </div>
+                    <Button size="sm" variant="ghost" @click="removePlayer(player.id)" class="h-8 w-8 p-0 text-destructive">
+                      <UserMinus class="h-4 w-4" />
+                    </Button>
+                  </div>
+                </ScrollArea>
+              </Card>
+            </div>
           </div>
-        </div>
-      </CardContent>
-      <CardFooter class="border-t pt-6">
-        <Button @click="handleCreate" :disabled="!newName || selectedPlayerIds.length < 2" class="w-full md:w-auto">
-          <Trophy class="w-4 h-4 mr-2" />
-          Criar Torneio com {{ selectedPlayerIds.length }} Jogadores
-        </Button>
-      </CardFooter>
-    </Card>
+        </CardContent>
+        <CardFooter class="border-t pt-6">
+          <Button @click="handleCreate" :disabled="!newName || selectedPlayerIds.length < 2" class="w-full md:w-auto">
+            <Trophy class="w-4 h-4 mr-2" />
+            Criar Torneio com {{ selectedPlayerIds.length }} Jogadores
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Listagem de Torneios -->
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
       <Card v-for="t in store.tournaments" :key="t.id" class="hover:border-primary transition-all cursor-pointer group" @click="router.push(`/tournaments/${t.id}`)">
         <CardHeader>
           <div class="flex justify-between items-start">
@@ -173,7 +177,7 @@ const getStatusLabel = (status: string) => {
         </CardFooter>
       </Card>
       
-      <div v-if="store.tournaments.length === 0 && !showForm" class="col-span-full py-20 text-center border-2 border-dashed rounded-xl bg-muted/20">
+      <div v-if="store.tournaments.length === 0" class="col-span-full py-20 text-center border-2 border-dashed rounded-xl bg-muted/20">
         <Trophy class="w-12 h-12 mx-auto text-muted-foreground mb-4" />
         <h3 class="text-lg font-medium">Nenhum torneio encontrado</h3>
         <p class="text-muted-foreground mb-6">Comece criando seu primeiro torneio de xadrez.</p>
