@@ -27,6 +27,14 @@ export const useChessStore = defineStore('chess', () => {
     players.value = players.value.filter(p => p.id !== id);
   };
 
+  const editPlayer = (id: string, updates: { name?: string; rating?: number }) => {
+    const player = players.value.find(p => p.id === id);
+    if (player) {
+      if (updates.name !== undefined) player.name = updates.name;
+      if (updates.rating !== undefined) player.rating = updates.rating;
+    }
+  };
+
   const addTournament = (tournament: Omit<Tournament, 'id' | 'rounds' | 'status'>) => {
     tournaments.value.push({
       ...tournament,
@@ -79,6 +87,7 @@ export const useChessStore = defineStore('chess', () => {
     tournaments,
     addPlayer,
     deletePlayer,
+    editPlayer,
     addTournament,
     updateTournament,
     deleteTournament,

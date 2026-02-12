@@ -7,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { UserPlus, Trash2, Users, Download, Upload, Database } from 'lucide-vue-next';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { UserPlus, Trash2, Users, Download, Upload, Database, Pencil } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 
 const store = useChessStore();
@@ -15,6 +16,11 @@ const newPlayerName = ref('');
 const newPlayerRating = ref(1200);
 const bulkPlayersText = ref('');
 const fileInput = ref<HTMLInputElement | null>(null);
+
+// Edit player state
+const editingPlayerId = ref<string | null>(null);
+const editingName = ref('');
+const editingRating = ref(0);
 
 const handleAddPlayer = () => {
   if (!newPlayerName.value.trim()) return;
@@ -54,6 +60,35 @@ const handleBulkAdd = () => {
     bulkPlayersText.value = '';
     toast.success(`${addedCount} jogadores adicionados com sucesso!`);
   }
+};
+
+const openEditDialog = (playerId: string) => {
+  const player = store.players.find(p => p.id === playerId);
+  if (player) {
+    editingPlayerId.value = playerId;
+    editingName.value = player.name;
+    editingRating.value = player.rating;
+  }
+};
+
+const handleSaveEdit = () => {
+  if (!editingName.value.trim()) {
+    toast.error('Nome não pode ser vazio');
+    return;
+  }
+
+  if (editingPlayerId.value) {
+    store.editPlayer(editingPlayerId.value, {
+      name: editingName.value,
+      rating: editingRating.value
+    });
+    editingPlayerId.value = null;
+    toast.success('Jogador atualizado com sucesso!');
+  }
+};
+
+const handleCancelEdit = () => {
+  editingPlayerId.value = null;
 };
 </script>
 
@@ -125,7 +160,10 @@ const handleBulkAdd = () => {
                 <TableRow v-for="player in store.players" :key="player.id">
                   <TableCell class="font-medium">{{ player.name }}</TableCell>
                   <TableCell>{{ player.rating }}</TableCell>
-                  <TableCell class="text-right">
+                  <TableCell class="text-right space-x-2">
+                    <Button variant="ghost" size="icon" @click="openEditDialog(player.id)">
+                      <Pencil class="w-4 h-4 text-primary" />
+                    </Button>
                     <Button variant="ghost" size="icon" @click="store.deletePlayer(player.id)">
                       <Trash2 class="w-4 h-4 text-destructive" />
                     </Button>
@@ -142,5 +180,31 @@ const handleBulkAdd = () => {
         </Card>
       </div>
     </div>
+
+    <!-- Edit Player Dialog -->
+    <Dialog :open="editingPlayerId !== null" @update:open="(open) => !open && handleCancelEdit()">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Editar Jogador</DialogTitle>
+        </DialogHeader>
+        
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Nome</label>
+            <Input v-model="editingName" placeholder="Nome do jogador" />
+          </div>
+          
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Rating</label>
+            <Input v-model.number="editingRating" type="number" />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" @click="handleCancelEdit">Cancelar</Button>
+          <Button @click="handleSaveEdit">Salvar Alterações</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
