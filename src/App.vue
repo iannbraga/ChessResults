@@ -1,45 +1,47 @@
 <script setup lang="ts">
+import { RouterLink, RouterView } from 'vue-router';
 import MadeWithDyad from './components/MadeWithDyad.vue';
+import { Trophy, Users } from 'lucide-vue-next';
 </script>
 
 <template>
-  <div class="app-layout">
-    <main class="main-content">
-      <h1>Starting Page</h1>
+  <div class="min-h-screen flex flex-col bg-background">
+    <header class="border-b bg-card">
+      <div class="container mx-auto px-6 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-2 font-bold text-xl">
+          <Trophy class="text-primary" />
+          <span>ChessManager</span>
+        </div>
+        <nav class="flex gap-6">
+          <RouterLink 
+            to="/tournaments" 
+            class="text-sm font-medium transition-colors hover:text-primary"
+            active-class="text-primary"
+          >
+            Torneios
+          </RouterLink>
+          <RouterLink 
+            to="/players" 
+            class="text-sm font-medium transition-colors hover:text-primary"
+            active-class="text-primary"
+          >
+            Jogadores
+          </RouterLink>
+        </nav>
+      </div>
+    </header>
+
+    <main class="flex-1">
+      <RouterView />
     </main>
+
     <MadeWithDyad />
   </div>
 </template>
 
-<style scoped>
-main {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100%;
-  padding: 2rem;
-  text-align: center;
-}
-
-h1 {
-  font-weight: 500;
+<style>
+body {
   margin: 0;
-  font-size: 2rem;
-}
-
-.app-layout {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-}
-
-.main-content {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 </style>
