@@ -112,47 +112,50 @@ const finishTournament = () => {
 </script>
 
 <template>
-  <div v-if="tournament" class="container mx-auto p-6 space-y-6">
+  <div v-if="tournament" class="container mx-auto p-3 md:p-6 space-y-6">
     <!-- Header com Ações -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 rounded-xl border shadow-sm sticky top-0 z-10">
-      <div class="flex items-center gap-4">
-        <Button variant="ghost" size="icon" @click="router.push('/tournaments')">
-          <ChevronLeft class="w-4 h-4" />
-        </Button>
-        <div>
-          <h1 class="text-xl font-bold leading-tight">{{ tournament.name }}</h1>
-          <div class="flex items-center gap-2 mt-1">
-            <Badge :variant="tournament.status === 'active' ? 'default' : 'secondary'" class="text-[10px] h-5">
-              {{ tournament.status === 'active' ? 'Em Andamento' : tournament.status === 'finished' ? 'Finalizado' : 'Planejado' }}
-            </Badge>
-            <span class="text-xs text-muted-foreground">{{ tournament.date }}</span>
+    <div class="flex flex-col gap-4 bg-card p-3 md:p-4 rounded-xl border shadow-sm sticky top-16 z-10">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <Button variant="ghost" size="icon" class="h-8 w-8" @click="router.push('/tournaments')">
+            <ChevronLeft class="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 class="text-lg sm:text-xl font-bold leading-tight break-words">{{ tournament.name }}</h1>
+            <div class="flex items-center gap-2 mt-1 flex-wrap">
+              <Badge :variant="tournament.status === 'active' ? 'default' : 'secondary'" class="text-[10px] h-5">
+                {{ tournament.status === 'active' ? 'Em Andamento' : tournament.status === 'finished' ? 'Finalizado' : 'Planejado' }}
+              </Badge>
+              <span class="text-xs text-muted-foreground">{{ tournament.date }}</span>
+            </div>
           </div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <template v-if="tournament.status === 'planned'">
+            <Button @click="startTournament" size="sm" class="w-full sm:w-auto">
+              <Play class="w-4 h-4 mr-2" />
+              Iniciar
+            </Button>
+          </template>
+          
+          <template v-if="tournament.status === 'active'">
+            <Button variant="outline" size="sm" @click="nextRound" :disabled="!canGenerateNext" class="w-full sm:w-auto">
+              <FastForward class="w-4 h-4 mr-2" />
+              Próxima
+            </Button>
+            <Button size="sm" @click="finishTournament" :disabled="!canGenerateNext" class="w-full sm:w-auto">
+              <CheckCircle2 class="w-4 h-4 mr-2" />
+              Finalizar
+            </Button>
+          </template>
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <template v-if="tournament.status === 'planned'">
-          <Button @click="startTournament" size="sm">
-            <Play class="w-4 h-4 mr-2" />
-            Iniciar Torneio
-          </Button>
-        </template>
-        
-        <template v-if="tournament.status === 'active'">
-          <div v-if="!canGenerateNext" class="hidden lg:flex items-center gap-2 text-xs text-orange-600 bg-orange-50 px-3 py-1.5 rounded-md border border-orange-100 mr-2">
-            <AlertCircle class="w-3.5 h-3.5" />
-            Aguardando resultados da Rodada {{ tournament.rounds.length }}
-          </div>
-          
-          <Button variant="outline" size="sm" @click="nextRound" :disabled="!canGenerateNext">
-            <FastForward class="w-4 h-4 mr-2" />
-            Próxima Rodada
-          </Button>
-          <Button size="sm" @click="finishTournament" :disabled="!canGenerateNext">
-            <CheckCircle2 class="w-4 h-4 mr-2" />
-            Finalizar
-          </Button>
-        </template>
+      <!-- Aviso de resultados pendentes -->
+      <div v-if="tournament.status === 'active' && !canGenerateNext" class="flex items-center gap-2 text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded-md border border-orange-100">
+        <AlertCircle class="w-3.5 h-3.5 flex-shrink-0" />
+        <span>Aguardando resultados da Rodada {{ tournament.rounds.length }}</span>
       </div>
     </div>
 
@@ -184,32 +187,32 @@ const finishTournament = () => {
             </Badge>
           </div>
           
-          <Card class="overflow-hidden">
+          <Card class="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow class="bg-muted/50">
-                  <TableHead class="w-[40%]">Brancas</TableHead>
-                  <TableHead class="text-center w-[20%]">Resultado</TableHead>
-                  <TableHead class="text-right w-[40%]">Pretas</TableHead>
+                  <TableHead class="w-[40%] min-w-[140px]">Brancas</TableHead>
+                  <TableHead class="text-center w-[20%] min-w-[120px]">Resultado</TableHead>
+                  <TableHead class="text-right w-[40%] min-w-[140px]">Pretas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow v-for="match in round.matches" :key="match.id" :class="match.isBye ? 'bg-primary/5' : ''">
-                  <TableCell class="font-medium py-3">
+                  <TableCell class="font-medium py-3 text-sm">
                     <div class="flex items-center gap-2">
-                      <div class="w-2 h-2 rounded-full bg-white border border-gray-300" title="Brancas"></div>
-                      <span class="text-sm">{{ getPlayerName(match.whiteId) }}</span>
+                      <div class="w-2 h-2 rounded-full bg-white border border-gray-300 flex-shrink-0" title="Brancas"></div>
+                      <span class="truncate">{{ getPlayerName(match.whiteId) }}</span>
                     </div>
                   </TableCell>
-                  <TableCell class="text-center">
+                  <TableCell class="text-center py-3">
                     <div v-if="match.isBye" class="text-xs font-bold text-primary">BYE (+1.0)</div>
-                    <div v-else class="flex items-center justify-center gap-2">
+                    <div v-else class="flex items-center justify-center gap-1 flex-wrap">
                       <Select
                         :model-value="match.result || 'null'"
                         @update:model-value="(val) => tournament && updateResult(tournament.rounds.length - 1 - rIdx, match.id, val === 'null' ? null : val)"
                         :disabled="tournament.status === 'finished'"
                       >
-                        <SelectTrigger class="w-24 mx-auto h-8 text-xs">
+                        <SelectTrigger class="w-20 h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -223,19 +226,19 @@ const finishTournament = () => {
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger>
-                            <Button variant="ghost" size="icon" :disabled="tournament.status === 'finished'" @click="tournament && swapColors(tournament.rounds.length - 1 - rIdx, match.id)">
-                              <Repeat class="w-4 h-4" />
+                            <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="tournament.status === 'finished'" @click="tournament && swapColors(tournament.rounds.length - 1 - rIdx, match.id)">
+                              <Repeat class="w-3 h-3" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Trocar cores</TooltipContent>
+                          <TooltipContent>Trocar</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     </div>
                   </TableCell>
-                  <TableCell class="text-right font-medium py-3">
+                  <TableCell class="text-right font-medium py-3 text-sm">
                     <div class="flex items-center justify-end gap-2">
-                      <span class="text-sm">{{ getPlayerName(match.blackId) }}</span>
-                      <div class="w-2 h-2 rounded-full bg-black" title="Pretas"></div>
+                      <span class="truncate">{{ getPlayerName(match.blackId) }}</span>
+                      <div class="w-2 h-2 rounded-full bg-black flex-shrink-0" title="Pretas"></div>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -246,61 +249,61 @@ const finishTournament = () => {
       </TabsContent>
 
       <TabsContent value="standings">
-        <Card>
+        <Card class="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow class="bg-muted/50">
-                <TableHead class="w-16 text-center">Pos</TableHead>
-                <TableHead>Jogador</TableHead>
-                <TableHead class="text-center">Pontos</TableHead>
-                <TableHead class="text-center">
-                  <div class="flex items-center justify-center gap-1">
-                    BH
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger><Info class="w-3 h-3" /></TooltipTrigger>
-                        <TooltipContent>Buchholz: Soma dos pontos dos oponentes</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
+                <TableHead class="w-12 text-center min-w-[48px]">Pos</TableHead>
+                <TableHead class="min-w-[140px]">Jogador</TableHead>
+                <TableHead class="text-center min-w-[60px]">Pts</TableHead>
+                <TableHead class="text-center min-w-[50px]">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger class="flex items-center justify-center gap-1">
+                        BH
+                        <Info class="w-3 h-3" />
+                      </TooltipTrigger>
+                      <TooltipContent>Buchholz</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </TableHead>
-                <TableHead class="text-center">
-                  <div class="flex items-center justify-center gap-1">
-                    SB
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger><Info class="w-3 h-3" /></TooltipTrigger>
-                        <TooltipContent>Sonneborn-Berger: Soma dos pontos dos oponentes derrotados + metade dos empatados</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
+                <TableHead class="text-center min-w-[50px]">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger class="flex items-center justify-center gap-1">
+                        SB
+                        <Info class="w-3 h-3" />
+                      </TooltipTrigger>
+                      <TooltipContent>Sonneborn-Berger</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </TableHead>
-                <TableHead class="text-center">Saldo Cores</TableHead>
-                <TableHead class="text-center">Rating Inicial</TableHead>
-                <TableHead class="text-center">Rating Final</TableHead>
-                <TableHead class="text-center">Mudança</TableHead>
+                <TableHead class="text-center min-w-[60px] text-xs">Cores</TableHead>
+                <TableHead class="text-center min-w-[70px] text-xs">Rt Ini</TableHead>
+                <TableHead class="text-center min-w-[70px] text-xs">Rt Fim</TableHead>
+                <TableHead class="text-center min-w-[50px] text-xs">Δ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow v-for="(s, idx) in standings" :key="s.playerId" :class="idx === 0 ? 'bg-yellow-500/5' : ''">
-                <TableCell class="text-center">
-                  <div v-if="idx === 0" class="flex justify-center"><Trophy class="w-5 h-5 text-yellow-500" /></div>
-                  <span v-else class="font-bold text-muted-foreground text-sm">{{ idx + 1 }}º</span>
-                </TableCell>
-                <TableCell class="font-medium text-sm">{{ s.playerName }}</TableCell>
-                <TableCell class="text-center">
-                  <Badge variant="secondary" class="text-sm font-bold px-2">{{ s.points }}</Badge>
-                </TableCell>
-                <TableCell class="text-center font-medium text-sm">{{ s.buchholz }}</TableCell>
-                <TableCell class="text-center font-medium text-sm">{{ s.sonnebornBerger }}</TableCell>
                 <TableCell class="text-center text-sm">
+                  <div v-if="idx === 0" class="flex justify-center"><Trophy class="w-4 h-4 text-yellow-500" /></div>
+                  <span v-else class="font-bold text-muted-foreground">{{ idx + 1 }}</span>
+                </TableCell>
+                <TableCell class="font-medium text-sm truncate">{{ s.playerName }}</TableCell>
+                <TableCell class="text-center">
+                  <Badge variant="secondary" class="text-xs font-bold">{{ s.points }}</Badge>
+                </TableCell>
+                <TableCell class="text-center font-medium text-xs">{{ s.buchholz }}</TableCell>
+                <TableCell class="text-center font-medium text-xs">{{ s.sonnebornBerger }}</TableCell>
+                <TableCell class="text-center text-xs">
                   <span :class="s.colorBalance > 0 ? 'text-blue-600' : s.colorBalance < 0 ? 'text-orange-600' : ''">
                     {{ s.colorBalance > 0 ? '+' : '' }}{{ s.colorBalance }}
                   </span>
                 </TableCell>
-                <TableCell class="text-center font-medium text-sm">{{ s.ratingInitial }}</TableCell>
-                <TableCell class="text-center font-medium text-sm">{{ s.ratingFinal }}</TableCell>
-                <TableCell class="text-center text-sm">
+                <TableCell class="text-center font-medium text-xs">{{ s.ratingInitial }}</TableCell>
+                <TableCell class="text-center font-medium text-xs">{{ s.ratingFinal }}</TableCell>
+                <TableCell class="text-center text-xs">
                   <span :class="s.ratingChange > 0 ? 'text-green-600' : s.ratingChange < 0 ? 'text-red-600' : ''">
                     {{ s.ratingChange > 0 ? '+' : '' }}{{ s.ratingChange }}
                   </span>

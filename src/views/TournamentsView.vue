@@ -61,12 +61,12 @@ const getStatusLabel = (status: string) => {
 </script>
 
 <template>
-  <div class="container mx-auto p-6 space-y-8">
-    <div class="flex justify-between items-center">
-      <h1 class="text-3xl font-bold">{{ showForm ? 'Novo Torneio' : 'Torneios' }}</h1>
-      <Button @click="showForm = !showForm" :variant="showForm ? 'ghost' : 'default'">
+  <div class="container mx-auto p-3 md:p-6 space-y-8">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+      <h1 class="text-2xl sm:text-3xl font-bold">{{ showForm ? 'Novo Torneio' : 'Torneios' }}</h1>
+      <Button @click="showForm = !showForm" :variant="showForm ? 'ghost' : 'default'" class="w-full sm:w-auto">
         <component :is="showForm ? ArrowLeft : Plus" class="w-4 h-4 mr-2" />
-        {{ showForm ? 'Voltar para Lista' : 'Novo Torneio' }}
+        {{ showForm ? 'Voltar' : 'Novo' }}
       </Button>
     </div>
 
@@ -85,12 +85,12 @@ const getStatusLabel = (status: string) => {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Jogadores Disponíveis -->
             <div class="space-y-3">
-              <div class="flex items-center justify-between">
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <label class="text-sm font-semibold flex items-center gap-2">
-                  Jogadores Disponíveis
+                  Disponíveis
                   <Badge variant="secondary">{{ availablePlayers.length }}</Badge>
                 </label>
-                <div class="relative w-40">
+                <div class="relative w-full sm:w-40">
                   <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input v-model="searchQuery" placeholder="Buscar..." class="pl-8 h-8 text-xs" />
                 </div>
@@ -98,15 +98,15 @@ const getStatusLabel = (status: string) => {
               <Card class="bg-muted/30">
                 <ScrollArea class="h-[350px] p-2">
                   <div v-if="availablePlayers.length === 0" class="text-center py-10 text-muted-foreground text-sm">
-                    Nenhum jogador disponível.
+                    Nenhum disponível.
                   </div>
                   <div v-for="player in availablePlayers" :key="player.id" 
                     class="flex items-center justify-between p-2 hover:bg-background rounded-md transition-colors mb-1 border border-transparent hover:border-border">
-                    <div class="flex flex-col">
-                      <span class="text-sm font-medium">{{ player.name }}</span>
-                      <span class="text-xs text-muted-foreground">Rating: {{ player.rating }}</span>
+                    <div class="flex flex-col min-w-0">
+                      <span class="text-sm font-medium truncate">{{ player.name }}</span>
+                      <span class="text-xs text-muted-foreground">{{ player.rating }}</span>
                     </div>
-                    <Button size="sm" variant="ghost" @click="addPlayer(player.id)" class="h-8 w-8 p-0 text-primary">
+                    <Button size="sm" variant="ghost" @click="addPlayer(player.id)" class="h-8 w-8 p-0 text-primary flex-shrink-0">
                       <UserPlus class="h-4 w-4" />
                     </Button>
                   </div>
@@ -117,21 +117,21 @@ const getStatusLabel = (status: string) => {
             <!-- Jogadores Adicionados -->
             <div class="space-y-3">
               <label class="text-sm font-semibold flex items-center gap-2">
-                Jogadores Adicionados
+                Adicionados
                 <Badge variant="default">{{ addedPlayers.length }}</Badge>
               </label>
               <Card class="border-primary/20 bg-primary/5">
                 <ScrollArea class="h-[350px] p-2">
-                  <div v-if="addedPlayers.length === 0" class="text-center py-10 text-muted-foreground text-sm">
-                    Adicione pelo menos 2 jogadores.
+                  <div v-if="addedPlayers.length === 0" class="text-center py-10 text-muted-foreground text-sm text-xs">
+                    Mínimo 2 jogadores
                   </div>
                   <div v-for="player in addedPlayers" :key="player.id" 
                     class="flex items-center justify-between p-2 bg-background rounded-md shadow-sm mb-1 border border-border">
-                    <div class="flex flex-col">
-                      <span class="text-sm font-medium">{{ player.name }}</span>
-                      <span class="text-xs text-muted-foreground">Rating: {{ player.rating }}</span>
+                    <div class="flex flex-col min-w-0">
+                      <span class="text-sm font-medium truncate">{{ player.name }}</span>
+                      <span class="text-xs text-muted-foreground">{{ player.rating }}</span>
                     </div>
-                    <Button size="sm" variant="ghost" @click="removePlayer(player.id)" class="h-8 w-8 p-0 text-destructive">
+                    <Button size="sm" variant="ghost" @click="removePlayer(player.id)" class="h-8 w-8 p-0 text-destructive flex-shrink-0">
                       <UserMinus class="h-4 w-4" />
                     </Button>
                   </div>
@@ -141,49 +141,49 @@ const getStatusLabel = (status: string) => {
           </div>
         </CardContent>
         <CardFooter class="border-t pt-6">
-          <Button @click="handleCreate" :disabled="!newName || selectedPlayerIds.length < 2" class="w-full md:w-auto">
+          <Button @click="handleCreate" :disabled="!newName || selectedPlayerIds.length < 2" class="w-full">
             <Trophy class="w-4 h-4 mr-2" />
-            Criar Torneio com {{ selectedPlayerIds.length }} Jogadores
+            Criar ({{ selectedPlayerIds.length }} Jogadores)
           </Button>
         </CardFooter>
       </Card>
     </div>
 
     <!-- Listagem de Torneios -->
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 animate-in fade-in duration-300">
       <Card v-for="t in store.tournaments" :key="t.id" class="hover:border-primary transition-all cursor-pointer group" @click="router.push(`/tournaments/${t.id}`)">
-        <CardHeader>
-          <div class="flex justify-between items-start">
-            <CardTitle class="group-hover:text-primary transition-colors">{{ t.name }}</CardTitle>
-            <Badge :variant="t.status === 'active' ? 'default' : 'secondary'">
+        <CardHeader class="pb-3">
+          <div class="flex justify-between items-start gap-2">
+            <CardTitle class="group-hover:text-primary transition-colors text-base truncate">{{ t.name }}</CardTitle>
+            <Badge :variant="t.status === 'active' ? 'default' : 'secondary'" class="text-[10px] flex-shrink-0">
               {{ getStatusLabel(t.status) }}
             </Badge>
           </div>
         </CardHeader>
-        <CardContent class="space-y-2 text-sm text-muted-foreground">
-          <div class="flex items-center">
-            <Calendar class="w-4 h-4 mr-2" />
+        <CardContent class="space-y-2 text-sm text-muted-foreground py-2">
+          <div class="flex items-center gap-2 text-xs">
+            <Calendar class="w-4 h-4 flex-shrink-0" />
             {{ t.date }}
           </div>
-          <div class="flex items-center">
-            <Users class="w-4 h-4 mr-2" />
+          <div class="flex items-center gap-2 text-xs">
+            <Users class="w-4 h-4 flex-shrink-0" />
             {{ t.playerIds.length }} Jogadores
           </div>
         </CardContent>
-        <CardFooter class="justify-end border-t pt-4">
-          <Button variant="ghost" size="icon" @click.stop="store.deleteTournament(t.id)" class="hover:bg-destructive/10">
+        <CardFooter class="justify-end border-t pt-3 px-6 py-3">
+          <Button variant="ghost" size="icon" class="h-8 w-8 hover:bg-destructive/10" @click.stop="store.deleteTournament(t.id)">
             <Trash2 class="w-4 h-4 text-destructive" />
           </Button>
         </CardFooter>
       </Card>
       
-      <div v-if="store.tournaments.length === 0" class="col-span-full py-20 text-center border-2 border-dashed rounded-xl bg-muted/20">
-        <Trophy class="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-        <h3 class="text-lg font-medium">Nenhum torneio encontrado</h3>
-        <p class="text-muted-foreground mb-6">Comece criando seu primeiro torneio de xadrez.</p>
-        <Button @click="showForm = true">
+      <div v-if="store.tournaments.length === 0" class="col-span-full py-16 sm:py-20 text-center border-2 border-dashed rounded-xl bg-muted/20 px-4">
+        <Trophy class="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-muted-foreground mb-3" />
+        <h3 class="text-base sm:text-lg font-medium">Nenhum torneio</h3>
+        <p class="text-xs sm:text-sm text-muted-foreground mb-6">Comece criando seu primeiro.</p>
+        <Button @click="showForm = true" size="sm">
           <Plus class="w-4 h-4 mr-2" />
-          Criar Primeiro Torneio
+          Criar Torneio
         </Button>
       </div>
     </div>

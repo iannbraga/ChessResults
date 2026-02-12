@@ -112,16 +112,16 @@ const handleCancelEdit = () => {
               </TabsList>
               
               <TabsContent value="single">
-                <form @submit.prevent="handleAddPlayer" class="flex gap-4 items-end">
+                <form @submit.prevent="handleAddPlayer" class="flex flex-col md:flex-row gap-3 md:gap-4 md:items-end">
                   <div class="flex-1 space-y-2">
                     <label class="text-sm font-medium">Nome</label>
                     <Input v-model="newPlayerName" placeholder="Nome do jogador" />
                   </div>
-                  <div class="w-32 space-y-2">
+                  <div class="w-full md:w-32 space-y-2">
                     <label class="text-sm font-medium">Rating</label>
                     <Input v-model.number="newPlayerRating" type="number" />
                   </div>
-                  <Button type="submit">
+                  <Button type="submit" class="w-full md:w-auto">
                     <UserPlus class="w-4 h-4 mr-2" />
                     Adicionar
                   </Button>
@@ -147,7 +147,7 @@ const handleCancelEdit = () => {
         </Card>
 
         <Card>
-          <CardContent class="pt-6">
+          <CardContent class="pt-6 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
