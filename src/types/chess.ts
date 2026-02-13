@@ -2,6 +2,8 @@ export interface Player {
   id: string;
   name: string;
   rating: number;
+  withdrawn?: boolean;
+  withdrawnAtRound?: number;
 }
 
 export interface Match {

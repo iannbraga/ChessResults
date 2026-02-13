@@ -3,10 +3,10 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 const MOBILE_BREAKPOINT = 768;
 
 export function useIsMobile() {
-  const isMobile = ref<boolean | undefined>(undefined);
+  const isMobileInternal = ref<boolean | undefined>(undefined);
 
   const updateIsMobile = () => {
-    isMobile.value = window.innerWidth < MOBILE_BREAKPOINT;
+    isMobileInternal.value = window.innerWidth < MOBILE_BREAKPOINT;
   };
 
   const setupMediaQuery = () => {
@@ -35,5 +35,7 @@ export function useIsMobile() {
   });
 
   // Return reactive value that converts undefined to false
-  return computed(() => !!isMobile.value);
+  const isMobile = computed(() => !!isMobileInternal.value);
+
+  return { isMobile };
 }

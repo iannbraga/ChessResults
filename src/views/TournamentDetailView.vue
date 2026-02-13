@@ -3,12 +3,13 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useChessStore } from '@/stores/chessStore';
 import { calculateStandings, generateNextRound } from '@/lib/chess-logic';
+import { useIsMobile } from '@/composables/useIsMobile';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { ChevronLeft, Play, CheckCircle2, FastForward, Trophy, Info, AlertCircle, Repeat } from 'lucide-vue-next';
+import { ChevronLeft, Play, CheckCircle2, FastForward, Trophy, Info, AlertCircle, Repeat, LogOut, Minus } from 'lucide-vue-next';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'vue-sonner';
@@ -16,6 +17,7 @@ import { toast } from 'vue-sonner';
 const route = useRoute();
 const router = useRouter();
 const store = useChessStore();
+const { isMobile } = useIsMobile();
 
 const tournament = computed(() => store.tournaments.find(t => t.id === route.params.id));
 const standings = computed(() => tournament.value ? calculateStandings(tournament.value, store.players) : []);
@@ -187,64 +189,128 @@ const finishTournament = () => {
             </Badge>
           </div>
           
-          <Card class="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow class="bg-muted/50">
-                  <TableHead class="w-[40%] min-w-[140px]">Brancas</TableHead>
-                  <TableHead class="text-center w-[20%] min-w-[120px]">Resultado</TableHead>
-                  <TableHead class="text-right w-[40%] min-w-[140px]">Pretas</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow v-for="match in round.matches" :key="match.id" :class="match.isBye ? 'bg-primary/5' : ''">
-                  <TableCell class="font-medium py-3 text-sm">
-                    <div class="flex items-center gap-2">
-                      <div class="w-2 h-2 rounded-full bg-white border border-gray-300 flex-shrink-0" title="Brancas"></div>
-                      <span class="truncate">{{ getPlayerName(match.whiteId) }}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell class="text-center py-3">
-                    <div v-if="match.isBye" class="text-xs font-bold text-primary">BYE (+1.0)</div>
-                    <div v-else class="flex items-center justify-center gap-1 flex-wrap">
-                      <Select
-                        :model-value="match.result || 'null'"
-                        @update:model-value="(val) => tournament && updateResult(tournament.rounds.length - 1 - rIdx, match.id, val === 'null' ? null : val)"
-                        :disabled="tournament.status === 'finished'"
-                      >
-                        <SelectTrigger class="w-20 h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="null">-</SelectItem>
-                          <SelectItem value="1-0">1 - 0</SelectItem>
-                          <SelectItem value="0.5-0.5">½ - ½</SelectItem>
-                          <SelectItem value="0-1">0 - 1</SelectItem>
-                        </SelectContent>
-                      </Select>
+          <!-- Desktop Layout (Tabela) -->
+          <div v-if="!isMobile" class="overflow-x-auto">
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow class="bg-muted/50">
+                    <TableHead class="w-12 text-center min-w-[48px]">Mesa</TableHead>
+                    <TableHead class="w-[40%] min-w-[140px]">Brancas</TableHead>
+                    <TableHead class="text-center w-[20%] min-w-[120px]">Resultado</TableHead>
+                    <TableHead class="text-right w-[40%] min-w-[140px]">Pretas</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow v-for="(match, mIdx) in round.matches" :key="match.id" :class="match.isBye ? 'bg-primary/5' : ''">
+                    <TableCell class="text-center font-bold text-sm">{{ mIdx + 1 }}</TableCell>
+                    <TableCell class="font-medium py-3 text-sm">
+                      <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-white border border-gray-300 flex-shrink-0" title="Brancas"></div>
+                        <span class="truncate">{{ getPlayerName(match.whiteId) }}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell class="text-center py-3">
+                      <div v-if="match.isBye" class="text-xs font-bold text-primary">BYE (+1.0)</div>
+                      <div v-else class="flex items-center justify-center gap-1 flex-wrap">
+                        <Select
+                          :model-value="match.result || 'null'"
+                          @update:model-value="(val) => tournament && updateResult(tournament.rounds.length - 1 - rIdx, match.id, val === 'null' ? null : val)"
+                          :disabled="tournament.status === 'finished'"
+                        >
+                          <SelectTrigger class="w-20 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="null">-</SelectItem>
+                            <SelectItem value="1-0">1 - 0</SelectItem>
+                            <SelectItem value="0.5-0.5">½ - ½</SelectItem>
+                            <SelectItem value="0-1">0 - 1</SelectItem>
+                          </SelectContent>
+                        </Select>
 
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="tournament.status === 'finished'" @click="tournament && swapColors(tournament.rounds.length - 1 - rIdx, match.id)">
-                              <Repeat class="w-3 h-3" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Trocar</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="tournament.status === 'finished'" @click="tournament && swapColors(tournament.rounds.length - 1 - rIdx, match.id)">
+                                <Repeat class="w-3 h-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Trocar</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </TableCell>
+                    <TableCell class="text-right font-medium py-3 text-sm">
+                      <div class="flex items-center justify-end gap-2">
+                        <span class="truncate">{{ getPlayerName(match.blackId) }}</span>
+                        <div class="w-2 h-2 rounded-full bg-black flex-shrink-0" title="Pretas"></div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </Card>
+          </div>
+
+          <!-- Mobile Layout (Compact List) -->
+          <div v-else class="bg-card border rounded-lg overflow-hidden">
+            <div class="space-y-0">
+              <div v-for="(match, mIdx) in round.matches" :key="match.id" class="border-b last:border-b-0 hover:bg-muted/30 transition-colors" :class="match.isBye ? 'bg-primary/5' : ''">
+                <div class="flex items-center gap-3 px-4 py-3 text-sm">
+                  <!-- Número da Mesa -->
+                  <div class="font-bold text-base w-8 flex-shrink-0 text-muted-foreground">{{ mIdx + 1 }}</div>
+
+                  <!-- Jogadores -->
+                  <div class="flex-1 min-w-0">
+                    <!-- Jogador de Brancas -->
+                    <div class="flex items-center gap-1.5 mb-1.5">
+                      <div class="w-1.5 h-1.5 rounded-full bg-white border border-gray-300 flex-shrink-0" title="Brancas"></div>
+                      <span class="truncate font-medium text-xs">{{ getPlayerName(match.whiteId) }}</span>
                     </div>
-                  </TableCell>
-                  <TableCell class="text-right font-medium py-3 text-sm">
-                    <div class="flex items-center justify-end gap-2">
-                      <span class="truncate">{{ getPlayerName(match.blackId) }}</span>
-                      <div class="w-2 h-2 rounded-full bg-black flex-shrink-0" title="Pretas"></div>
+
+                    <!-- Jogador de Pretas -->
+                    <div class="flex items-center gap-1.5">
+                      <div class="w-1.5 h-1.5 rounded-full bg-black flex-shrink-0" title="Pretas"></div>
+                      <span class="truncate font-medium text-xs">{{ getPlayerName(match.blackId) }}</span>
                     </div>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </Card>
+                  </div>
+
+                  <!-- Resultado e Ações -->
+                  <div class="flex items-center gap-2 flex-shrink-0 ml-2">
+                    <div v-if="match.isBye" class="text-xs font-bold text-primary whitespace-nowrap">BYE</div>
+                    <Select
+                      v-else
+                      :model-value="match.result || 'null'"
+                      @update:model-value="(val) => tournament && updateResult(tournament.rounds.length - 1 - rIdx, match.id, val === 'null' ? null : val)"
+                      :disabled="tournament.status === 'finished'"
+                    >
+                      <SelectTrigger class="w-16 h-7 text-xs py-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="null">-</SelectItem>
+                        <SelectItem value="1-0">1-0</SelectItem>
+                        <SelectItem value="0.5-0.5">½-½</SelectItem>
+                        <SelectItem value="0-1">0-1</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <TooltipProvider v-if="!match.isBye">
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Button variant="ghost" size="icon" class="h-7 w-7" :disabled="tournament.status === 'finished'" @click="tournament && swapColors(tournament.rounds.length - 1 - rIdx, match.id)">
+                            <Repeat class="w-3 h-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Trocar</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </TabsContent>
 
@@ -282,10 +348,11 @@ const finishTournament = () => {
                 <TableHead class="text-center min-w-[70px] text-xs">Rt Ini</TableHead>
                 <TableHead class="text-center min-w-[70px] text-xs">Rt Fim</TableHead>
                 <TableHead class="text-center min-w-[50px] text-xs">Δ</TableHead>
+                <TableHead class="text-center min-w-[48px] text-xs">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="(s, idx) in standings" :key="s.playerId" :class="idx === 0 ? 'bg-yellow-500/5' : ''">
+              <TableRow v-for="(s, idx) in standings" :key="s.playerId" :class="[idx === 0 ? 'bg-yellow-500/5' : '', store.players.find(p => p.id === s.playerId)?.withdrawn ? 'opacity-50 line-through' : '']">
                 <TableCell class="text-center text-sm">
                   <div v-if="idx === 0" class="flex justify-center"><Trophy class="w-4 h-4 text-yellow-500" /></div>
                   <span v-else class="font-bold text-muted-foreground">{{ idx + 1 }}</span>
@@ -303,11 +370,6 @@ const finishTournament = () => {
                 </TableCell>
                 <TableCell class="text-center font-medium text-xs">{{ s.ratingInitial }}</TableCell>
                 <TableCell class="text-center font-medium text-xs">{{ s.ratingFinal }}</TableCell>
-                <TableCell class="text-center text-xs">
-                  <span :class="s.ratingChange > 0 ? 'text-green-600' : s.ratingChange < 0 ? 'text-red-600' : ''">
-                    {{ s.ratingChange > 0 ? '+' : '' }}{{ s.ratingChange }}
-                  </span>
-                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
